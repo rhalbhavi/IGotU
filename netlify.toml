@@ -1,0 +1,60 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/support/:slug"
+  to = "/residential.html?org=:slug"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/workspace"
+  to = "/.netlify/functions/auth-workspace"
+  status = 200
+
+[[redirects]]
+  from = "/api/organizations/mine"
+  to = "/.netlify/functions/organizations-mine"
+  status = 200
+
+[[redirects]]
+  from = "/api/organizations"
+  to = "/.netlify/functions/organizations"
+  status = 200
+
+[[redirects]]
+  from = "/api/organizations/:slug"
+  to = "/.netlify/functions/organization?slug=:slug"
+  status = 200
+
+[[redirects]]
+  from = "/api/organization-qr/:slug"
+  to = "/.netlify/functions/organization-qr?slug=:slug"
+  status = 200
+
+[[redirects]]
+  from = "/setup"
+  to = "/setup.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin"
+  to = "/setup"
+  status = 301
+
+[[redirects]]
+  from = "/about"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/"
+  to = "/residential.html"
+  status = 200

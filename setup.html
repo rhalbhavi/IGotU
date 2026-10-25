@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#155e52">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Admin Setup — IGotU</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="48x48">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/image-protection.js" defer></script>
+  <script type="module" src="/setup.js"></script>
+</head>
+<body>
+  <main class="page-shell admin-shell">
+    <header class="brand">
+      <a href="/about" aria-label="IGotU home">
+        <img class="brand-mark" src="/assets/images/logo.png" alt="">
+      </a>
+      <div>
+        <h1>IGotU<span>.</span></h1>
+        <p class="tagline">HELP, ONE SCAN AWAY</p>
+      </div>
+    </header>
+
+    <section class="admin-page-heading">
+      <h2>Admin Setup</h2>
+      <p>Manage your organization’s public support page</p>
+    </section>
+
+    <p id="admin-status" class="admin-status" role="status" aria-live="polite">
+      Connect your Firebase project to get started.
+    </p>
+
+    <section id="auth-panel" class="admin-panel" aria-labelledby="auth-title">
+      <h2 id="auth-title">Continue with your organization’s Google Workspace account</h2>
+      <p>Only Google Workspace accounts on your organization’s domain are accepted. Personal Gmail accounts aren’t supported.</p>
+      <button class="button button-primary" id="google-sign-in" type="button">Continue with Google</button>
+    </section>
+
+    <section id="dashboard" hidden>
+      <div class="admin-panel admin-account">
+        <div>
+          <h2>Your account</h2>
+          <p>Signed in as <strong id="account-email"></strong> · Workspace domain: <strong id="workspace-domain"></strong></p>
+        </div>
+        <div class="admin-actions">
+          <button class="button button-secondary" id="refresh-google-session" type="button">Refresh Google session</button>
+          <button class="button button-secondary" id="sign-out" type="button">Sign out</button>
+        </div>
+      </div>
+
+      <section class="admin-panel organization-picker-row" aria-labelledby="organization-picker-label">
+        <h2 id="organization-picker-label">Choose your Organization</h2>
+        <select id="organization-select" aria-label="Choose your Organization">
+          <option value="">Choose an organization</option>
+        </select>
+      </section>
+
+      <section class="admin-panel" aria-labelledby="create-org-title">
+        <h2 id="create-org-title">Create an organization page</h2>
+        <p>Create a page for an organization using your verified Google Workspace domain. You can publish it yourself when it’s ready.</p>
+        <form id="create-org-form" class="admin-form">
+          <label for="new-org-name">Organization or location name</label>
+          <input id="new-org-name" type="text" minlength="2" maxlength="100" required>
+          <label for="new-org-slug">Page address</label>
+          <div class="slug-input-row">
+            <span id="slug-origin"></span>
+            <input id="new-org-slug" type="text" maxlength="48" pattern="[a-z0-9]+(-[a-z0-9]+)*" required>
+          </div>
+          <small>Lowercase letters, numbers, and hyphens only.</small>
+          <label for="new-org-type">Organization type</label>
+          <select id="new-org-type" required>
+            <option value="residential">Residential community</option>
+            <option value="campus">Campus</option>
+            <option value="educational">Educational institution</option>
+            <option value="public">Public / community location</option>
+          </select>
+          <button class="button button-primary" type="submit">Create organization</button>
+        </form>
+      </section>
+
+      <form id="organization-form" class="admin-panel admin-form" hidden>
+        <h2 id="organization-form-title">Organization settings</h2>
+        <p>Support contacts shown on the public page are visible to anyone with its link.</p>
+        <label for="edit-org-name">Organization name</label>
+        <input id="edit-org-name" type="text" minlength="2" maxlength="100" required>
+        <label for="edit-org-type">Organization type</label>
+        <select id="edit-org-type" required>
+          <option value="residential">Residential community</option>
+          <option value="campus">Campus</option>
+          <option value="educational">Educational institution</option>
+          <option value="public">Public / community location</option>
+        </select>
+        <p class="slug-display">Page address: <code id="edit-org-slug"></code></p>
+
+        <fieldset>
+          <legend>Organization details</legend>
+          <p>Your verified Google Workspace domain is used to associate this admin account with the organization.</p>
+          <label for="organization-address">Organization address</label>
+          <input id="organization-address" type="text" maxlength="250" autocomplete="street-address">
+          <label for="organization-website">Organization website (HTTPS)</label>
+          <input id="organization-website" type="url" maxlength="500" placeholder="https://example.org">
+          <small>These details are self-reported. IGotU does not manually verify organizations.</small>
+        </fieldset>
+
+        <fieldset>
+          <legend>Security contact</legend>
+          <label for="security-label">Display name</label>
+          <input id="security-label" type="text" maxlength="60" placeholder="Community Security">
+          <label for="security-phone">Phone number</label>
+          <input id="security-phone" type="tel" inputmode="tel" maxlength="24" placeholder="+91 98765 43210">
+          <label for="security-description">Short details (optional)</label>
+          <input id="security-description" type="text" maxlength="150" placeholder="Available at the front desk">
+        </fieldset>
+
+        <fieldset>
+          <legend>Medical services</legend>
+          <label for="medical-label">Display name</label>
+          <input id="medical-label" type="text" maxlength="60" placeholder="On-site Medical Services">
+          <label for="medical-phone">Phone number</label>
+          <input id="medical-phone" type="tel" inputmode="tel" maxlength="24" placeholder="+91 98765 43210">
+          <label for="medical-description">Short details (optional)</label>
+          <input id="medical-description" type="text" maxlength="150" placeholder="Clinic hours or location">
+        </fieldset>
+
+        <fieldset>
+          <legend>Counsellor or student support</legend>
+          <label for="counselor-label">Display name</label>
+          <input id="counselor-label" type="text" maxlength="60" placeholder="Campus Counsellor">
+          <label for="counselor-phone">Phone number</label>
+          <input id="counselor-phone" type="tel" inputmode="tel" maxlength="24" placeholder="+91 98765 43210">
+          <label for="counselor-description">Short details (optional)</label>
+          <input id="counselor-description" type="text" maxlength="150" placeholder="Availability or appointment details">
+        </fieldset>
+
+        <label class="publish-option">
+          <input id="publish-organization" type="checkbox">
+          Publish this page so anyone with its link can view it
+        </label>
+        <div class="admin-actions">
+          <button class="button button-primary" id="save-organization" type="submit">Save settings</button>
+          <button class="button button-secondary" id="publish-organization-button" type="button">Publish now</button>
+          <button class="button button-secondary" id="unpublish-organization-button" type="button">Unpublish</button>
+          <button class="button button-secondary" id="copy-page-link" type="button">Copy public page link</button>
+          <a class="button button-secondary" id="download-qr" href="#" hidden>Download QR code</a>
+        </div>
+        <p id="page-link-preview" class="page-link-preview"></p>
+        <img id="organization-qr" class="organization-qr" alt="QR code linking to this organization's IGotU support page" hidden>
+      </form>
+    </section>
+
+    <footer>
+      <p><a href="/about">IGotU</a> · Organization support pages</p>
+      <p class="privacy-note">Workspace sign-in is required to edit pages. Public contact details are visible to page visitors.</p>
+    </footer>
+  </main>
+</body>
+</html>

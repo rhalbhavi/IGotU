@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#155e52">
+  <meta name="description" content="IGotU helps residents find emergency, local, and mental health support.">
+  <title>IGotU — Help, One Scan Away</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="48x48">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/image-protection.js" defer></script>
+  <script src="/script.js" defer></script>
+  <script type="module" src="/public-org.js"></script>
+</head>
+<body>
+  <main class="page-shell">
+    <header class="brand">
+      <img class="brand-mark" src="/assets/images/logo.png" alt="">
+      <div>
+        <h1>IGotU<span>.</span></h1>
+        <p class="tagline">HELP, ONE SCAN AWAY</p>
+      </div>
+    </header>
+
+    <section class="intro" aria-labelledby="intro-title">
+      <h2 id="intro-title">Choose your support option below.</h2>
+      <p id="organization-name" class="organization-name" hidden></p>
+      <p id="organization-status" class="organization-status" role="status" aria-live="polite" hidden></p>
+    </section>
+
+    <div class="contact-categories">
+    <section class="contact-group" aria-labelledby="emergency-title">
+      <div class="section-heading">
+        <h2 id="emergency-title">EMERGENCY SERVICES</h2>
+        <p>For immediate police, fire, or ambulance emergencies.</p>
+      </div>
+      <div class="urgent-panel">
+        <div class="urgent-copy">
+          <span class="urgent-icon material-symbols-rounded" aria-hidden="true">emergency</span>
+          <div>
+            <h2>112 — National Emergency Helpline</h2>
+            <p>Primary emergency contact for police, fire, and ambulance assistance in India.</p>
+          </div>
+        </div>
+        <a class="button button-emergency" href="tel:112" aria-label="Call 112, National Emergency Helpline">
+          <span>CALL NOW</span><span aria-hidden="true">↗</span>
+        </a>
+      </div>
+      <div class="contact-options" aria-label="Additional emergency numbers">
+        <a class="support-card" href="tel:102" aria-label="Call 102 ambulance service">
+          <span class="card-icon icon-emergency material-symbols-rounded" aria-hidden="true">health_cross</span>
+          <span class="card-copy"><strong>102 — Ambulance</strong></span>
+          <span class="card-arrow" aria-hidden="true">›</span>
+        </a>
+        <a class="support-card" href="tel:100">
+          <span class="card-icon icon-security material-symbols-rounded" aria-hidden="true">local_police</span>
+          <span class="card-copy"><strong>100 — Police</strong></span>
+          <span class="card-arrow" aria-hidden="true">›</span>
+        </a>
+        <a class="support-card" href="tel:101">
+          <span class="card-icon icon-helpline material-symbols-rounded" aria-hidden="true">fire_extinguisher</span>
+          <span class="card-copy"><strong>101 — Fire and Rescue</strong></span>
+          <span class="card-arrow" aria-hidden="true">›</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="contact-group" id="organization-section" aria-labelledby="local-title" hidden>
+      <div class="section-heading">
+        <h2 id="local-title">RESIDENTIAL SUPPORT</h2>
+        <p id="organization-support-description">Contact your community support services.</p>
+      </div>
+      <div class="contact-options">
+        <a class="support-card configurable-contact" id="security-contact" href="#" hidden>
+          <span class="card-icon icon-security material-symbols-rounded" aria-hidden="true">security</span>
+          <span class="card-copy"><strong id="security-name">Security</strong><small id="security-description"></small></span>
+          <span class="card-arrow" aria-hidden="true">›</span>
+        </a>
+        <a class="support-card configurable-contact" id="medical-contact" href="#" hidden>
+          <span class="card-icon icon-helpline material-symbols-rounded" aria-hidden="true">medical_services</span>
+          <span class="card-copy"><strong id="medical-name">Medical Services</strong><small id="medical-description"></small></span>
+          <span class="card-arrow" aria-hidden="true">›</span>
+        </a>
+        <a class="support-card configurable-contact" id="counselor-contact" href="#" hidden>
+          <span class="card-icon icon-counselling material-symbols-rounded" aria-hidden="true">support_agent</span>
+          <span class="card-copy"><strong id="counselor-name">Counsellor</strong><small id="counselor-description"></small></span>
+          <span class="card-arrow" aria-hidden="true">›</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="contact-group" aria-labelledby="mental-health-title">
+      <div class="section-heading">
+        <h2 id="mental-health-title">MENTAL HEALTH SUPPORT</h2>
+        <p>Reach out to Tele-MANAS or someone you trust.</p>
+      </div>
+      <div class="contact-options">
+        <button class="support-card support-card-button" id="trusted-button" type="button" aria-haspopup="dialog" aria-controls="trusted-dialog">
+          <span class="card-icon icon-trusted material-symbols-rounded" aria-hidden="true">sentiment_satisfied</span>
+          <span class="card-copy"><strong>Talk to Someone You Trust</strong><small>Call or message a friend, family member, or trusted person.</small></span>
+          <span class="card-arrow" aria-hidden="true">›</span>
+        </button>
+        <article class="support-card telemanas-card">
+          <span class="card-icon icon-helpline material-symbols-rounded" aria-hidden="true">call</span>
+          <span class="card-copy">
+            <strong>Tele-MANAS</strong>
+            <small>India's mental health support helpline.</small>
+            <span class="helpline-links">
+              <a href="tel:14416" aria-label="Call Tele-MANAS on 14416">14416</a>
+              <a href="tel:18008914416" aria-label="Call Tele-MANAS on 1800-891-4416">1800-891-4416</a>
+            </span>
+          </span>
+        </article>
+        <article class="support-card telemanas-card">
+          <span class="card-icon icon-helpline material-symbols-rounded" aria-hidden="true">call</span>
+          <span class="card-copy">
+            <strong>KIRAN Mental Health Rehabilitation Helpline</strong>
+            <small>Toll-free; support in 13 languages.</small>
+            <span class="helpline-links">
+              <a href="tel:18005990019" aria-label="Call KIRAN on 1800-599-0019">1800-599-0019</a>
+            </span>
+          </span>
+        </article>
+        <article class="support-card telemanas-card">
+          <span class="card-icon icon-helpline material-symbols-rounded" aria-hidden="true">call</span>
+          <span class="card-copy">
+            <strong>Vandrevala Foundation Helpline</strong>
+            <small>24/7 crisis intervention and counselling.</small>
+            <span class="helpline-links">
+              <a href="tel:9999666555" aria-label="Call Vandrevala Foundation at 9999-666-555">Call 9999-666-555</a>
+              <a id="vandrevala-whatsapp" href="https://wa.me/919999666555" aria-label="Message Vandrevala Foundation on WhatsApp at +91 9999-666-555">WhatsApp</a>
+            </span>
+          </span>
+        </article>
+        <article class="support-card telemanas-card">
+          <span class="card-icon icon-helpline material-symbols-rounded" aria-hidden="true">call</span>
+          <span class="card-copy">
+            <strong>1 Life Crisis Support &amp; Suicide Prevention</strong>
+            <small>24/7 support.</small>
+            <span class="helpline-links">
+              <a href="tel:7893078930" aria-label="Call 1 Life on 78930-78930">78930-78930</a>
+            </span>
+          </span>
+        </article>
+      </div>
+    </section>
+    </div>
+
+    <section class="reassurance" aria-label="A supportive message">
+      <p class="reassurance-quote">You don't have to go through something alone. ❤️</p>
+      <p>Start with whichever option feels safest. Asking for support is enough for now.</p>
+    </section>
+
+    <footer>
+      <p><a href="/about"><strong>IGotU</strong></a> · Help, one scan away</p>
+      <p class="privacy-note">This page does not send messages or share your location automatically. Calls, messages, and sharing are initiated by you.</p>
+      <button class="text-button" id="info-button" type="button">Important information</button>
+    </footer>
+  </main>
+
+  <dialog class="modal" id="trusted-dialog" aria-labelledby="trusted-title">
+    <form method="dialog" class="modal-close-row">
+      <button class="close-button" aria-label="Close dialog">x</button>
+    </form>
+    <h2 id="trusted-title">Talk to someone you trust</h2>
+    <button class="button button-secondary button-full" id="pick-contacts" type="button">Allow IGotU to access your saved contacts</button>
+    <label for="contact-search">Search selected contacts</label>
+    <input id="contact-search" type="search" placeholder="Search selected contacts" autocomplete="off" disabled>
+    <ul class="contact-results" id="contact-results" aria-label="Selected contacts" hidden></ul>
+    <label for="trusted-number">Phone number (optional)</label>
+    <input id="trusted-number" type="tel" inputmode="tel" autocomplete="tel" placeholder="Enter a phone number">
+    <div class="modal-actions">
+      <button class="button button-primary" id="call-trusted" type="button">Call them</button>
+      <button class="button button-secondary" id="sms-trusted" type="button">Text them</button>
+    </div>
+    <p id="contact-status" class="status-message" role="status" aria-live="polite"></p>
+    <div class="message-preview">
+      <p class="preview-label">Suggested message</p>
+      <p id="suggested-message">Hey, I'm having a difficult time and need help. Are you available to call or meet me now?</p>
+      <button class="text-button copy-message-button" id="copy-message" type="button" aria-live="polite">
+        <span class="material-symbols-rounded" aria-hidden="true">content_copy</span>
+        <span>Copy message</span>
+      </button>
+    </div>
+    <button class="button button-secondary button-full" id="share-location" type="button">Share my location with someone</button>
+    <p class="small-note">Your browser may ask for location permission when this window opens. Location is never shared automatically; sharing requires a separate action.</p>
+    <p class="status-message" id="trusted-status" role="status" aria-live="polite"></p>
+  </dialog>
+
+  <dialog class="modal app-choice-dialog" id="message-app-dialog" aria-labelledby="message-app-title">
+    <form method="dialog" class="modal-close-row">
+      <button class="close-button" aria-label="Close app selection">x</button>
+    </form>
+    <h2 id="message-app-title">Choose a messaging app</h2>
+    <p>Select an app to open a pre-filled message. Review and send it to your contact.</p>
+    <div class="modal-actions app-choice-actions">
+      <button class="button button-primary" id="open-whatsapp" type="button">WhatsApp</button>
+      <button class="button button-secondary" id="open-sms" type="button">SMS</button>
+    </div>
+  </dialog>
+
+  <dialog class="modal" id="info-dialog" aria-labelledby="info-title">
+    <form method="dialog" class="modal-close-row">
+      <button class="close-button" aria-label="Close dialog">x</button>
+    </form>
+    <h2 id="info-title">Important information</h2>
+    <p>IGotU lists ways to contact emergency services, local support, mental health helplines, or someone you trust. Tapping a call link opens your device's phone app with the listed number so you can place the call. IGotU itself does not place or receive calls, or dispatch responders.</p>
+    <p>If you or someone else is in immediate danger, use the 112 call link or dial 112 from your phone. Your device must be able to place the call; IGotU does not automatically notify emergency services.</p>
+    <p>Calls, messages, and location sharing are started by you. Review the recipient and message before sending; your location is shared only after you choose a sharing option.</p>
+    <p>Helpline availability and local service coverage may change. If a number does not connect, use your local emergency service or another available support option.</p>
+    <button class="button button-primary button-full" id="close-info" type="button">I understand</button>
+  </dialog>
+
+  <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false">
+    <span class="material-symbols-rounded" id="theme-icon" aria-hidden="true">dark_mode</span>
+  </button>
+</body>
+</html>
