@@ -18,7 +18,6 @@ const contactResults = document.querySelector("#contact-results");
 const messageAppDialog = document.querySelector("#message-app-dialog");
 const themeToggle = document.querySelector("#theme-toggle");
 const themeIcon = document.querySelector("#theme-icon");
-let selectedLocation = null;
 
 const suggestedMessage =
   "Hey, I'm having a difficult time right . Are you available to call or meet me right now?";
@@ -54,7 +53,6 @@ document.querySelector("#trusted-button")?.addEventListener("click", () => {
   if (!trustedDialog || !trustedStatus) return;
   trustedStatus.textContent = "";
   trustedDialog.showModal();
-  requestCurrentLocation();
 });
 
 document.querySelector("#pick-contacts")?.addEventListener("click", async () => {
@@ -174,86 +172,6 @@ document.querySelector("#copy-message")?.addEventListener("click", async (event)
       "Copy isn't available in this browser. You can select and copy the suggested message manually.";
   }
 });
-
-// Share the user's location voluntarily
-document.querySelector("#share-location")?.addEventListener("click", () => {
-  if (!trustedStatus) return;
-  if (selectedLocation) {
-    shareCurrentLocation(selectedLocation);
-    return;
-  }
-  requestCurrentLocation();
-});
-
-function requestCurrentLocation() {
-  if (!trustedStatus) return;
-  if (!("geolocation" in navigator)) {
-    trustedStatus.textContent =
-      "Location isn't supported by this browser. You can share your location from your maps app instead.";
-    return;
-  }
-
-  trustedStatus.textContent = "Requesting location permission from your browser…";
-
-  try {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        selectedLocation = position;
-        trustedStatus.textContent =
-          "Location is available. Press “Share my location” when you're ready; it won't be sent automatically.";
-      },
-      (error) => {
-        if (error.code === error.PERMISSION_DENIED) {
-          trustedStatus.textContent =
-            "Location permission wasn't granted. You can enable it in browser settings or continue without sharing location.";
-        } else {
-          trustedStatus.textContent =
-            "Couldn't get your location. You can continue without sharing it or use your maps app.";
-        }
-      },
-      {
-        enableHighAccuracy: false,
-        timeout: 10000,
-        maximumAge: 60000
-      }
-    );
-  } catch {
-    trustedStatus.textContent =
-      "Couldn't request your location. You can share it from your maps app instead.";
-  }
-}
-
-async function shareCurrentLocation(position) {
-  if (!trustedStatus) return;
-  const { latitude, longitude } = position.coords;
-  const mapUrl = `https://maps.google.com/?q=${latitude},${longitude}`;
-  const shareText = `I could use some support. Here's my current location: ${mapUrl}`;
-
-  try {
-    if (navigator.share) {
-      await navigator.share({
-        title: "My location",
-        text: shareText,
-        url: mapUrl
-      });
-      trustedStatus.textContent =
-        "Sharing options opened. Choose a trusted person and send only if you want to.";
-    } else if (navigator.clipboard) {
-      await navigator.clipboard.writeText(shareText);
-      trustedStatus.textContent =
-        "Location link copied. Paste it into a message to someone you trust.";
-    } else {
-      window.open(mapUrl, "_blank", "noopener,noreferrer");
-      trustedStatus.textContent =
-        "Your map opened. Share the location with someone you trust if you choose.";
-    }
-  } catch (error) {
-    if (error.name !== "AbortError") {
-      trustedStatus.textContent =
-        "Couldn't open sharing options. You can share your location directly from your maps app.";
-    }
-  }
-}
 
 function renderSelectedContacts(contacts) {
   if (!contactResults || !contactSearch || !trustedNumber) return;
