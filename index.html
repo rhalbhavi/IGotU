@@ -13,6 +13,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
   <script src="/image-protection.js" defer></script>
+  <script src="/theme.js" defer></script>
 </head>
 <body>
   <main class="page-shell">
@@ -26,17 +27,15 @@
 
     <section class="intro">
       <h2>Support, made easier to find.</h2>
-      <p>IGotU helps a community connect with the local support services and trusted contacts it chooses.</p>
+      <h3>IGotU helps people in communities and public spaces connect with the local, regional, and national support services and trusted contacts they need in situations of emergency or distress.</h3>
     </section>
 
     <div class="about-content">
       <section>
-        <h2>One platform, dedicated organization pages</h2>
+        <h2>For organizations</h2>
+        <h3>One platform, dedicated organization pages</h3>
         <p>Organizations can configure a dedicated support page for their residential community, educational campus, office, or other location. Each page has its own stable link and QR code while using the same IGotU experience.</p>
         <p>Location pages are shared directly by the organization, for example through its QR code. This overview does not publish a directory of organization pages.</p>
-      </section>
-      <section>
-        <h2>For organizations</h2>
         <p>Verified organization admins can sign in to add and maintain local security, medical, and counsellor contacts. They can publish their page and download its QR code from the dashboard.</p>
         <div class="about-actions">
           <a class="button button-primary" href="/setup">Organization setup</a>
@@ -55,5 +54,8 @@
       <p class="privacy-note">IGotU does not access visitors' device locations. Calls and messages are initiated by the visitor.</p>
     </footer>
   </main>
+  <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false">
+    <span class="material-symbols-rounded" id="theme-icon" aria-hidden="true">dark_mode</span>
+  </button>
 </body>
 </html>

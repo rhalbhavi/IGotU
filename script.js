@@ -16,8 +16,6 @@ const contactStatus = document.querySelector("#contact-status");
 const contactSearch = document.querySelector("#contact-search");
 const contactResults = document.querySelector("#contact-results");
 const messageAppDialog = document.querySelector("#message-app-dialog");
-const themeToggle = document.querySelector("#theme-toggle");
-const themeIcon = document.querySelector("#theme-icon");
 
 const suggestedMessage =
   "Hey, I'm having a difficult time right . Are you available to call or meet me right now?";
@@ -34,18 +32,6 @@ document.querySelectorAll("dialog.modal").forEach((dialog) => {
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog) dialog.close();
   });
-});
-
-themeToggle?.addEventListener("click", () => {
-  if (!themeIcon) return;
-  const isDark = document.documentElement.dataset.theme !== "dark";
-  document.documentElement.dataset.theme = isDark ? "dark" : "light";
-  themeToggle.setAttribute("aria-pressed", String(isDark));
-  themeToggle.setAttribute(
-    "aria-label",
-    `Switch to ${isDark ? "light" : "dark"} mode`
-  );
-  themeIcon.textContent = isDark ? "light_mode" : "dark_mode";
 });
 
 // Open the trusted contact dialog

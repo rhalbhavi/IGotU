@@ -9,6 +9,7 @@ const publicFiles = [
   "script.js",
   "public-org.js",
   "setup.js",
+  "theme.js",
   "image-protection.js",
   "firebase-config.js",
   "favicon.ico",

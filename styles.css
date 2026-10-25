@@ -70,14 +70,16 @@ a { color: inherit; }
   letter-spacing: .12em;
 }
 
-h1, h2, p { margin-top: 0; }
+h1, h2, h3, p { margin-top: 0; }
 h1, h2 { font-family: 'Manrope', 'DM Sans', sans-serif; }
 h1 { margin: 0; font-size: calc(2rem + 2px); line-height: 1.05; letter-spacing: -.06em; }
 h1 span { color: #54a58f; }
+h3 { color: var(--ink); font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: inherit; font-weight: 400; }
 .tagline { margin: 5px 0 0; color: var(--muted); font-size: calc(.92rem + 2px); font-weight: 800; }
 
 .intro { margin-bottom: 22px; text-align: center; }
 .intro h2 { margin: 8px 0 10px; font-size: clamp(calc(1.55rem + 2px), calc(6vw + 2px), calc(2rem + 2px)); line-height: 1.15; letter-spacing: -.045em; }
+.intro h3, .admin-page-heading > p { font-size: calc(1rem + 4px); }
 .intro > p:last-child { padding-bottom: 9px; margin-bottom: 0; color: var(--muted); font-size: calc(.96rem + 2px); }
 .intro::after { display: block; margin-top: 14px; border-top: 1px solid var(--divider); content: ""; }
 .organization-name { margin: 10px 0 0; color: var(--brand); font-size: calc(1rem + 2px); font-weight: 800; }
@@ -302,7 +304,7 @@ footer strong { color: var(--brand); }
 
 .admin-shell { max-width: 900px; }
 .admin-page-heading { margin: 0 0 22px; text-align: center; }
-.admin-page-heading h2 { margin-bottom: 4px; font-size: calc(1.4rem + 2px); }
+.admin-page-heading h2 { margin: 8px 0 10px; font-size: clamp(calc(1.55rem + 2px), calc(6vw + 2px), calc(2rem + 2px)); line-height: 1.15; letter-spacing: -.045em; }
 .admin-page-heading p { color: var(--muted); }
 .admin-status { padding: 12px 15px; border: 1px solid var(--divider); border-radius: 12px; color: var(--muted); background: var(--brand-soft); }
 .admin-panel { padding: 22px; margin: 16px 0; border: 1px solid var(--divider); border-radius: 18px; background: var(--surface); }

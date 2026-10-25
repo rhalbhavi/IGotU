@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#155e52">
   <meta name="robots" content="noindex, nofollow">
-  <title>Admin Setup — IGotU</title>
+  <title>Admin Setup | IGotU</title>
   <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="48x48">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
   <script src="/image-protection.js" defer></script>
+  <script src="/theme.js" defer></script>
   <script type="module" src="/setup.js"></script>
 </head>
 <body>
@@ -28,7 +29,7 @@
 
     <section class="admin-page-heading">
       <h2>Admin Setup</h2>
-      <p>Manage your organization’s public support page</p>
+      <p>Manage your organization's public support page</p>
     </section>
 
     <p id="admin-status" class="admin-status" role="status" aria-live="polite">
@@ -36,8 +37,8 @@
     </p>
 
     <section id="auth-panel" class="admin-panel" aria-labelledby="auth-title">
-      <h2 id="auth-title">Continue with your organization’s Google Workspace account</h2>
-      <p>Only Google Workspace accounts on your organization’s domain are accepted. Personal Gmail accounts aren’t supported.</p>
+      <h2 id="auth-title">Continue with your organization's Google Workspace account</h2>
+      <p>Only Google Workspace accounts on your organization's domain are accepted. Personal Gmail accounts aren't supported.</p>
       <button class="button button-primary" id="google-sign-in" type="button">Continue with Google</button>
     </section>
 
@@ -158,5 +159,8 @@
       <p class="privacy-note">Workspace sign-in is required to edit pages. Public contact details are visible to page visitors.</p>
     </footer>
   </main>
+  <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false">
+    <span class="material-symbols-rounded" id="theme-icon" aria-hidden="true">dark_mode</span>
+  </button>
 </body>
 </html>
