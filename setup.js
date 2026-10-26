@@ -24,7 +24,7 @@ let workspaceDomain = "";
 document.querySelector("#slug-origin").textContent = `${window.location.origin}/`;
 
 if (!isFirebaseConfigured) {
-  status.textContent = "Firebase is not configured yet. Add your Firebase web app settings to firebase-config.js.";
+  status.textContent = "Admin setup is temporarily unavailable. Please try again later.";
   authPanel.hidden = true;
 } else {
   auth = getAuth(initializeApp(firebaseConfig));
@@ -265,8 +265,19 @@ async function apiRequest(url, method = "GET", body) {
     },
     ...(body ? { body: JSON.stringify(body) } : {})
   });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "The request could not be completed.");
+  const responseText = await response.text();
+  let result;
+  try {
+    result = responseText ? JSON.parse(responseText) : {};
+  } catch {
+    if (!response.ok) {
+      throw new Error(
+        `The server could not complete the request (HTTP ${response.status}). Please try again later.`
+      );
+    }
+    throw new Error("The server returned an invalid response. Please try again later.");
+  }
+  if (!response.ok) throw new Error(result.error || `The request failed (HTTP ${response.status}).`);
   return result;
 }
 

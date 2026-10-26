@@ -4,7 +4,7 @@ IGotU is a shared static site with Netlify Functions. Firebase Authentication si
 
 ## One-time platform configuration
 
-1. In Firebase Console, enable **Authentication → Sign-in method → Google** and add the Netlify site domain to Authorized domains.
+1. In Firebase Console, enable **Authentication → Sign-in method → Google**. Under **Authentication → Settings → Authorized domains**, add the exact hostname used to open the site, such as `your-project.vercel.app` (no `https://` or path). Add any Vercel preview or custom domains from which admins will sign in as well.
 2. Copy the Firebase Web app settings into `firebase-config.js`.
 3. In Google Cloud Console, get the OAuth 2.0 **Web application client ID** used by the Firebase Google sign-in provider.
 4. Create a MongoDB Atlas database user restricted to the IGotU database and copy the Atlas connection string.
