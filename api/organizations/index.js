@@ -15,7 +15,7 @@ export default async function handler(request, response) {
     }
     const user = await requireVerifiedUser(request);
     if (request.body?.workspaceDomain !== user.workspaceDomain) {
-      throw new HttpError(403, "The organization must use the same domain as your verified Google Workspace account.");
+      throw new HttpError(403, "The organization must use the same domain as your verified organization email.");
     }
     const slug = validateSlug(request.body?.slug);
     const settings = readOrganizationInput(request.body);

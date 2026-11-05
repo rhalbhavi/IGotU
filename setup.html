@@ -38,9 +38,26 @@
     </p>
 
     <section id="auth-panel" class="admin-panel" aria-labelledby="auth-title">
-      <h2 id="auth-title">Continue with your organization's Google Workspace account</h2>
-      <p>Only Google Workspace accounts on your organization's domain are accepted. Personal Gmail accounts aren't supported.</p>
-      <button class="button button-primary" id="google-sign-in" type="button">Continue with Google</button>
+      <h2 id="auth-title">Sign in to manage your organization support page</h2>
+      <p>Continue with Google Workspace or organization email. Both options send a one-time email link before dashboard access. Personal Gmail accounts aren't accepted.</p>
+      <div class="auth-actions">
+        <button class="button button-email" id="email-sign-in" type="button">
+          <span class="material-symbols-rounded" aria-hidden="true">mail</span>
+          Continue with Email
+        </button>
+        <button class="button button-primary google-sign-in" id="google-sign-in" type="button">
+          <img class="google-icon" src="https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3c/Google_Favicon_2025.svg/250px-Google_Favicon_2025.svg.png" alt="">
+          Continue with Google
+        </button>
+      </div>
+      <form id="email-sign-in-form" class="email-sign-in-form" hidden>
+        <label for="email-sign-in-address">Organization email address</label>
+        <div class="email-sign-in-row">
+          <input id="email-sign-in-address" type="email" autocomplete="email" required>
+          <button class="button button-primary" type="submit">Send sign-in link</button>
+        </div>
+        <small>We'll send a one-time email link to verify your address and sign you in.</small>
+      </form>
     </section>
 
     <section id="dashboard" hidden>
@@ -57,7 +74,7 @@
 
       <section class="admin-panel" aria-labelledby="create-org-title">
         <h2 id="create-org-title">Create an organization page</h2>
-        <p>Create a page for an organization using your verified Google Workspace domain. You can publish it yourself when it’s ready.</p>
+        <p>Create a page for an organization using your verified organization email domain. You can publish it yourself when it’s ready.</p>
         <form id="create-org-form" class="admin-form">
           <label for="new-org-name">Organization or location name</label>
           <input id="new-org-name" type="text" minlength="2" maxlength="100" required>
@@ -102,7 +119,7 @@
 
         <fieldset>
           <legend>Organization details</legend>
-          <p>Your verified Google Workspace domain is used to associate this admin account with the organization.</p>
+          <p>Your verified email domain is used to associate this admin account with the organization.</p>
           <label for="organization-address">Organization address</label>
           <input id="organization-address" type="text" maxlength="250" autocomplete="street-address">
           <label for="edit-place-search">Select organization location</label>

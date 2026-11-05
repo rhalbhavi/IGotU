@@ -43,7 +43,7 @@ export default async function handler(request, response) {
       throw new HttpError(400, "Add at least one local contact before publishing.");
     }
     if (current.workspaceDomain && current.workspaceDomain !== user.email.split("@")[1]?.toLowerCase()) {
-      throw new HttpError(403, "Sign in with an account from this organization’s Google Workspace domain.");
+      throw new HttpError(403, "Sign in with an account from this organization’s verified email domain.");
     }
 
     const updatedAt = new Date();
