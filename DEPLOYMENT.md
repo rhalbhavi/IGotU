@@ -1,6 +1,6 @@
 # IGotU deployment and organization setup
 
-IGotU is a shared static site with Netlify Functions. Firebase Authentication signs admins in with Google; server-side functions verify the Firebase and Google identity tokens; MongoDB Atlas stores organization profiles, support contacts, and page publishing state. Organization setup and editing happens through the `/setup` web interface.
+IGotU is a shared static site deployed on Vercel. Firebase Authentication signs admins in with Google; server-side functions verify the Firebase and Google identity tokens; MongoDB Atlas stores organization profiles, support contacts, and page publishing state. Organization setup and editing happens through the `/setup` web interface.
 
 ## One-time platform configuration
 
@@ -8,7 +8,7 @@ IGotU is a shared static site with Netlify Functions. Firebase Authentication si
 2. Copy the Firebase Web app settings into `firebase-config.js`.
 3. In Google Cloud Console, get the OAuth 2.0 **Web application client ID** used by the Firebase Google sign-in provider.
 4. Create a MongoDB Atlas database user restricted to the IGotU database and copy the Atlas connection string.
-5. In Netlify, set these environment variables for Functions:
+5. In Vercel, open the IGotU project’s **Settings → Environment Variables** and add the following variables. Select **Production** and also **Preview** if you test sign-in on preview deployments:
 
 | Variable | Value |
 | --- | --- |
@@ -18,21 +18,21 @@ IGotU is a shared static site with Netlify Functions. Firebase Authentication si
 | `FIREBASE_CLIENT_EMAIL` | Firebase service-account client email |
 | `FIREBASE_PRIVATE_KEY` | Firebase service-account private key |
 | `GOOGLE_OAUTH_CLIENT_ID` | Google OAuth Web client ID used by Firebase Auth |
-| `PUBLIC_SITE_URL` | Canonical Netlify URL, such as `https://your-site.netlify.app` |
+| `PUBLIC_SITE_URL` | `https://igotu-web.vercel.app` |
 
-Keep the service-account key and Atlas connection string in Netlify environment variables only. `firebase-config.js` contains public Firebase Web app settings; never put server credentials there.
+For `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY`, open Firebase Console → **Project settings → Service accounts → Generate new private key**. Use the `client_email` and `private_key` values from the downloaded JSON for those two variables; use `igotu-f4f80` for `FIREBASE_PROJECT_ID`. Store the private key as-is (including its `BEGIN PRIVATE KEY` and `END PRIVATE KEY` lines); if the Vercel input requires a single line, use `\n` between lines. Never put this service-account key or the Atlas connection string in the repository or `firebase-config.js`.
 
-Deploy the repository to Netlify with the included `netlify.toml`. Its build command creates a small `dist/` static site and maps `/api/*` to Netlify Functions.
+`firebase-config.js` contains public Firebase Web app settings only. After adding or changing Vercel environment variables, redeploy the project so its serverless functions receive them. The build creates the static site in `dist/`; Vercel serves the API handlers from `api/`.
 
 ## Admin setup and self-service publishing
 
-1. An organization admin opens `https://your-site.netlify.app/setup` and chooses **Continue with Google**.
+1. An organization admin opens `https://igotu-web.vercel.app/setup` and chooses **Continue with Google**.
 2. The popup must return a verified Google Workspace identity with a hosted-domain claim. Personal Gmail addresses and Google accounts not managed by a Workspace domain are rejected server-side. The admin may create pages only for the verified Workspace domain.
 3. The admin creates a named organization/location, selects it in **Choose your Organization**, and enters its address, website, and local security, medical, and counsellor contacts.
 4. The admin saves a private draft or publishes it directly. IGotU does not manually review or approve pages. The organization admin is responsible for accurate numbers and updates.
 5. After publishing, the dashboard provides a shareable page URL and a QR code. Updating contacts leaves that URL unchanged.
 
-The public page URL uses a path, for example `https://your-site.netlify.app/support/cedar-apartments`. A free `*.netlify.app` site cannot create a separate `organization.igotu.netlify.app` subdomain for each tenant. Per-organization subdomains such as `cedar.yourdomain.com` require a domain you control and wildcard DNS/domain configuration. Path-based pages work without buying a domain.
+The public page URL uses a path, for example `https://igotu-web.vercel.app/support/cedar-apartments`. Each organization gets a unique page path. Organization-specific subdomains require a domain you control and wildcard DNS/domain configuration. Path-based pages work without buying a domain.
 
 ## Pages and routes
 
