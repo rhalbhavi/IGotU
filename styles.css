@@ -308,9 +308,6 @@ footer strong { color: var(--brand); }
 .admin-page-heading p { color: var(--muted); }
 .admin-status { padding: 12px 15px; border: 1px solid var(--divider); border-radius: 12px; color: var(--muted); background: var(--brand-soft); }
 .admin-panel { padding: 22px; margin: 16px 0; border: 1px solid var(--divider); border-radius: 18px; background: var(--surface); }
-.organization-picker-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
-.organization-picker-row h2 { margin: 0; }
-.organization-picker-row select { width: min(55%, 390px); min-height: 46px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--surface); }
 .place-search { position: relative; z-index: 2; }
 .place-search-input-row { display: flex; gap: 8px; }
 .place-search-input-row input { min-width: 0; flex: 1; }
@@ -372,8 +369,6 @@ footer strong { color: var(--brand); }
   .admin-shell { padding-right: 16px; padding-left: 16px; }
   .admin-account { align-items: flex-start; flex-direction: column; }
   .slug-input-row { align-items: stretch; flex-direction: column; }
-  .organization-picker-row { align-items: stretch; flex-direction: column; gap: 10px; }
-  .organization-picker-row select { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

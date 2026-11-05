@@ -11,7 +11,6 @@ import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js";
 const status = document.querySelector("#admin-status");
 const authPanel = document.querySelector("#auth-panel");
 const dashboard = document.querySelector("#dashboard");
-const organizationSelect = document.querySelector("#organization-select");
 const organizationForm = document.querySelector("#organization-form");
 const createOrganizationForm = document.querySelector("#create-org-form");
 let auth;
@@ -121,13 +120,6 @@ createOrganizationForm.addEventListener("submit", async (event) => {
   }
 });
 
-organizationSelect.addEventListener("change", () => {
-  selectedOrganization = organizations.find(
-    (organization) => organization.slug === organizationSelect.value
-  );
-  showOrganization(selectedOrganization);
-});
-
 organizationForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!selectedOrganization) return;
@@ -190,24 +182,12 @@ async function handleAuthState(user) {
   setStatus("Select Continue with Google to verify your Workspace domain for this session.");
 }
 
-async function loadOrganizations(selectedSlug = organizationSelect.value) {
+async function loadOrganizations(selectedSlug = "") {
   try {
     const result = await apiRequest("/api/organizations/mine");
     organizations = result.organizations;
-    organizationSelect.replaceChildren(new Option("Choose an organization", ""));
-    for (const organization of organizations) {
-      const option = new Option(
-        `${organization.name} — ${organization.published ? "published" : "draft"}`,
-        organization.slug
-      );
-      organizationSelect.add(option);
-    }
-    organizationSelect.value = organizations.some((item) => item.slug === selectedSlug)
-      ? selectedSlug
-      : "";
-    selectedOrganization = organizations.find(
-      (item) => item.slug === organizationSelect.value
-    );
+    const currentSlug = selectedSlug || (organizations.length === 1 ? organizations[0].slug : "");
+    selectedOrganization = organizations.find((item) => item.slug === currentSlug);
     showOrganization(selectedOrganization);
     if (organizations.length === 0) {
       setStatus("No pages yet. Create a draft page for your organization.");
