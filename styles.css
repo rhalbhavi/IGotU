@@ -303,7 +303,6 @@ footer strong { color: var(--brand); }
 :root[data-theme="dark"] .theme-toggle { border-color: #fff; color: #000; background: #fff; }
 :root[data-theme="dark"] .verification-note { color: var(--muted); }
 
-.admin-shell, .about-shell { max-width: 1270px; }
 .admin-page-heading { margin: 0 0 22px; text-align: center; }
 .admin-page-heading h2 { margin: 8px 0 10px; font-size: clamp(calc(1.55rem + 2px), calc(6vw + 2px), calc(2rem + 2px)); line-height: 1.15; letter-spacing: -.045em; }
 .admin-page-heading p { padding-top: 3px; color: var(--ink); }
@@ -368,6 +367,7 @@ footer strong { color: var(--brand); }
 
 @media (min-width: 960px) {
   .page-shell { width: min(100% - 48px, 1370px); padding-right: 32px; padding-left: 32px; }
+  .content-shell { width: min(100% - 48px, 1270px); }
   .contact-categories { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
   .contact-categories > .contact-group { padding: 0 24px; }
   .contact-categories > .contact-group:first-child { padding-left: 0; }
