@@ -17,6 +17,7 @@ import {
 import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js";
 
 const status = document.querySelector("#admin-status");
+const authStatus = document.querySelector("#auth-status");
 const authPanel = document.querySelector("#auth-panel");
 const dashboard = document.querySelector("#dashboard");
 const emailSignInButton = document.querySelector("#email-sign-in");
@@ -437,7 +438,10 @@ function slugify(value) {
 }
 
 function setStatus(message) {
-  status.textContent = message;
+  const target = dashboard.hidden ? authStatus : status;
+  const other = dashboard.hidden ? status : authStatus;
+  target.textContent = message;
+  other.textContent = "";
 }
 
 function initializePlaceSearch(prefix, onPlaceSelected) {
