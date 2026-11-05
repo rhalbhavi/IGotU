@@ -311,6 +311,13 @@ footer strong { color: var(--brand); }
 .organization-picker-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .organization-picker-row h2 { margin: 0; }
 .organization-picker-row select { width: min(55%, 390px); min-height: 46px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--surface); }
+.place-map { width: 100%; height: 320px; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: #e7ece9; }
+.map-help { margin: 0 0 4px; }
+.leaflet-container { z-index: 0; font: inherit; }
+.leaflet-geosearch-bar { max-width: min(360px, calc(100% - 24px)); }
+.leaflet-geosearch-bar form { border-radius: 9px; }
+.leaflet-geosearch-bar form input { min-height: 40px; }
+.leaflet-control-geosearch form.open { max-width: min(360px, calc(100vw - 56px)); }
 .google-sign-in-button { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; gap: 10px; }
 .admin-panel h2 { margin-bottom: 7px; font-size: calc(1.25rem + 2px); }
 .admin-panel > p { color: var(--muted); font-size: calc(.86rem + 2px); }

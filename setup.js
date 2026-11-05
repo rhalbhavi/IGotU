@@ -20,6 +20,9 @@ let selectedOrganization;
 let slugManuallyEdited = false;
 let workspaceIdToken = "";
 let workspaceDomain = "";
+const placeMaps = new Map();
+let nominatimQueue = Promise.resolve();
+let lastNominatimRequestAt = 0;
 
 document.querySelector("#slug-origin").textContent = `${window.location.origin}/`;
 
@@ -53,6 +56,14 @@ async function signInToWorkspace() {
     document.querySelector("#workspace-domain").textContent = workspaceDomain;
     dashboard.hidden = false;
     authPanel.hidden = true;
+    initializePlacePicker("create-place-map", (place) => {
+      document.querySelector("#new-org-address").value = place.address;
+      const nameInput = document.querySelector("#new-org-name");
+      if (!nameInput.value.trim()) {
+        nameInput.value = place.name;
+        nameInput.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
     document.querySelector("#account-email").textContent = credential.user.email || "";
     await loadOrganizations();
     setStatus(`Signed in with the ${workspaceDomain} Google Workspace domain.`);
@@ -82,6 +93,7 @@ createOrganizationForm.addEventListener("submit", async (event) => {
     name: document.querySelector("#new-org-name").value.trim(),
     slug: document.querySelector("#new-org-slug").value.trim(),
     type: document.querySelector("#new-org-type").value,
+    address: document.querySelector("#new-org-address").value.trim(),
     contacts: emptyContacts()
   };
   try {
@@ -207,6 +219,9 @@ function showOrganization(organization) {
   const publishOption = document.querySelector("#publish-organization");
   publishOption.checked = organization.published;
   document.querySelector("#organization-address").value = organization.address || "";
+  initializePlacePicker("edit-place-map", (place) => {
+    document.querySelector("#organization-address").value = place.address;
+  });
   document.querySelector("#organization-website").value = organization.website || "";
   document.querySelector("#workspace-domain").textContent = organization.workspaceDomain || workspaceDomain;
   for (const key of ["security", "medical", "counselor"]) {
@@ -299,4 +314,54 @@ function slugify(value) {
 
 function setStatus(message) {
   status.textContent = message;
+}
+
+function initializePlacePicker(containerId, onPlaceSelected) {
+  const container = document.getElementById(containerId);
+  if (!container || placeMaps.has(containerId)) return;
+  if (!window.L || !window.GeoSearch) {
+    container.hidden = true;
+    setStatus("The place search map could not load. You can still enter the address manually.");
+    return;
+  }
+
+  const map = window.L.map(container).setView([20.5937, 78.9629], 5);
+  window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  const osmProvider = new window.GeoSearch.OpenStreetMapProvider({
+    params: { "accept-language": document.documentElement.lang || "en" }
+  });
+  const provider = {
+    search(query) {
+      const request = nominatimQueue.then(async () => {
+        const wait = Math.max(0, 1100 - (Date.now() - lastNominatimRequestAt));
+        if (wait) await new Promise((resolve) => window.setTimeout(resolve, wait));
+        lastNominatimRequestAt = Date.now();
+        return osmProvider.search(query);
+      });
+      nominatimQueue = request.catch(() => {});
+      return request;
+    }
+  };
+  const search = new window.GeoSearch.GeoSearchControl({
+    provider,
+    style: "bar",
+    autoComplete: false,
+    searchLabel: "Search places",
+    keepResult: true,
+    showMarker: true,
+    retainZoomLevel: false
+  });
+  map.addControl(search);
+  map.on("geosearch/showlocation", ({ location }) => {
+    const address = (location.label || "").trim();
+    if (!address) return;
+    const placeName = location.raw?.name || address.split(",")[0];
+    onPlaceSelected({ name: placeName, address });
+  });
+  placeMaps.set(containerId, map);
+  requestAnimationFrame(() => map.invalidateSize());
 }
