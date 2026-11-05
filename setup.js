@@ -57,7 +57,7 @@ if (!isFirebaseConfigured) {
       emailSignInAddress.value = savedEmail;
       completeEmailLinkSignIn(savedEmail);
     } else {
-      setStatus("Enter the organization email address that received the sign-in link.");
+      setStatus("Enter the organization email address that received the sign-in link.", "error");
     }
   } else if (
     new URLSearchParams(window.location.search).get("finish") === "google-email-verification" ||
@@ -117,7 +117,7 @@ async function signInToWorkspace() {
       : error.message || "Google sign-in failed.";
     setStatus(popupWasClosed
       ? "Google sign-in cancelled. Click Continue with Google to choose an account."
-      : message);
+      : message, "error");
   }
 }
 
@@ -127,7 +127,7 @@ async function handleEmailSignIn(event) {
   const email = emailSignInAddress.value.trim().toLowerCase();
   const emailDomain = email.split("@").pop();
   if (!email || emailDomain === "gmail.com" || emailDomain === "googlemail.com") {
-    setStatus("Use your organization's email address. Personal Gmail accounts aren't accepted.");
+    setStatus("Use your organization's email address. Personal Gmail accounts aren't accepted.", "error");
     return;
   }
 
@@ -144,9 +144,9 @@ async function handleEmailSignIn(event) {
     setStatus("Verification email sent. Open its sign-in link to verify your address and continue.");
   } catch (error) {
     if (error.code === "auth/operation-not-allowed") {
-      setStatus("Email sign-in is not enabled for this project yet.");
+      setStatus("Email sign-in is not enabled for this project yet.", "error");
     } else {
-      setStatus(error.message || "Could not send the verification email.");
+      setStatus(error.message || "Could not send the verification email.", "error");
     }
   }
 }
@@ -167,7 +167,7 @@ async function continueGoogleSignInAfterEmailVerification() {
     provider.setCustomParameters({ prompt: "select_account" });
     await signInWithRedirect(auth, provider);
   } catch (error) {
-    setStatus(error.message || "Email verification failed. Request a new verification email.");
+    setStatus(error.message || "Email verification failed. Request a new verification email.", "error");
   }
 }
 
@@ -179,7 +179,7 @@ async function finishGoogleRedirectSignIn() {
     const actualEmail = credential.user.email?.toLowerCase() || "";
     if (expectedEmail && actualEmail !== expectedEmail) {
       await signOut(auth);
-      setStatus("Choose the Google account whose email address you verified.");
+      setStatus("Choose the Google account whose email address you verified.", "error");
       return;
     }
     const googleCredential = GoogleAuthProvider.credentialFromResult(credential);
@@ -190,7 +190,7 @@ async function finishGoogleRedirectSignIn() {
     workspaceIdToken = googleCredential.idToken;
     await connectSignedInUser(credential.user);
   } catch (error) {
-    setStatus(error.message || "Google sign-in could not be completed.");
+    setStatus(error.message || "Google sign-in could not be completed.", "error");
   }
 }
 
@@ -202,7 +202,7 @@ async function completeEmailLinkSignIn(email) {
     await connectSignedInUser(credential.user);
   } catch (error) {
     await signOut(auth).catch(() => {});
-    setStatus(error.message || "That sign-in link is invalid or expired. Request a new one.");
+    setStatus(error.message || "That sign-in link is invalid or expired. Request a new one.", "error");
   }
 }
 
@@ -327,7 +327,7 @@ async function handleAuthState(user) {
   }
   authPanel.hidden = false;
   organizationForm.hidden = true;
-  setStatus("Sign in again with Google or verify your organization email for this session.");
+  setStatus("Sign in again with Google or verify your organization email for this session.", "error");
 }
 
 async function loadOrganizations(selectedSlug = "") {
@@ -443,10 +443,11 @@ function slugify(value) {
     .replace(/-+$/g, "");
 }
 
-function setStatus(message) {
+function setStatus(message, kind = "success") {
   const target = dashboard.hidden ? authStatus : status;
   const other = dashboard.hidden ? status : authStatus;
   target.textContent = message;
+  authStatus.classList.toggle("is-error", target === authStatus && kind === "error");
   other.textContent = "";
 }
 

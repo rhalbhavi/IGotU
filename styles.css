@@ -309,6 +309,7 @@ footer strong { color: var(--brand); }
 .admin-status { padding: 12px 15px; border: 1px solid var(--divider); border-radius: 12px; color: var(--muted); background: var(--brand-soft); }
 .admin-status:empty { display: none; }
 #auth-status { margin-top: 10px; }
+#auth-status.is-error { border-color: #f0d3d0; color: var(--danger); background: var(--danger-bg); }
 .auth-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; margin-top: 18px; }
 .auth-actions .button { min-width: 220px; }
 .button-email { color: #fff; background: #1a73e8; }
