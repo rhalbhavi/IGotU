@@ -306,7 +306,7 @@ footer strong { color: var(--brand); }
 .admin-page-heading { margin: 0 0 22px; text-align: center; }
 .admin-page-heading h2 { margin: 8px 0 10px; font-size: clamp(calc(1.55rem + 2px), calc(6vw + 2px), calc(2rem + 2px)); line-height: 1.15; letter-spacing: -.045em; }
 .admin-page-heading p { padding-top: 3px; color: var(--ink); }
-.admin-status { padding: 22px 15px 12px; border: 1px solid var(--divider); border-radius: 12px; color: var(--muted); background: var(--brand-soft); }
+.admin-status { padding: 12px 15px; border: 1px solid var(--divider); border-radius: 12px; color: var(--muted); background: var(--brand-soft); }
 .admin-status:empty { display: none; }
 .auth-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; margin-top: 18px; }
 .auth-actions .button { min-width: 220px; }
