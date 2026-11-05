@@ -80,6 +80,9 @@ emailSignInForm.addEventListener("submit", handleEmailSignIn);
 async function signInToWorkspace() {
   if (!auth) return;
   const alreadyVerified = Boolean(workspaceIdToken);
+  if (!alreadyVerified) {
+    await signOut(auth).catch(() => {});
+  }
   setStatus("Opening Google sign-in…");
   try {
     const provider = new GoogleAuthProvider();
@@ -109,9 +112,12 @@ async function signInToWorkspace() {
       workspaceDomain = "";
       await signOut(auth).catch(() => {});
     }
+    const message = error.code === "auth/unauthorized-domain"
+      ? `This site (${window.location.hostname}) is not authorized for Firebase sign-in. Add this hostname in Firebase Console under Authentication → Settings → Authorized domains, then try again.`
+      : error.message || "Google sign-in failed.";
     setStatus(popupWasClosed
       ? "Google sign-in cancelled. Click Continue with Google to choose an account."
-      : error.message || "Google sign-in failed.");
+      : message);
   }
 }
 
