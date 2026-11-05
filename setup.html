@@ -61,7 +61,7 @@
         <form id="create-org-form" class="admin-form">
           <label for="new-org-name">Organization or location name</label>
           <input id="new-org-name" type="text" minlength="2" maxlength="100" required>
-          <label for="create-place-search">Find this organization or location</label>
+          <label for="create-place-search">Select organization location</label>
           <div class="place-search">
             <div class="place-search-input-row">
               <input id="create-place-search" type="search" placeholder="Search places" autocomplete="off" aria-autocomplete="list" aria-controls="create-place-results" aria-expanded="false">
@@ -69,22 +69,20 @@
             </div>
             <div id="create-place-results" class="place-search-results" role="listbox" aria-label="Place search results" hidden></div>
           </div>
-          <small>Search and choose a result to fill its name and address. Search data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>.</small>
-          <label for="new-org-address">Organization address</label>
-          <input id="new-org-address" type="text" maxlength="250" autocomplete="street-address">
+          <small>Search and choose a result to fill in the organization name and location. Search data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>.</small>
+          <input id="new-org-address" type="hidden">
+          <label for="new-org-type">Organization type</label>
+          <select id="new-org-type" required>
+            <option value="residential">Residential community</option>
+            <option value="educational">Educational institution</option>
+            <option value="public">Public / community location</option>
+          </select>
           <label for="new-org-slug">Page address</label>
           <div class="slug-input-row">
             <span id="slug-origin"></span>
             <input id="new-org-slug" type="text" maxlength="48" pattern="[a-z0-9]+(-[a-z0-9]+)*" required>
           </div>
-          <small>Lowercase letters, numbers, and hyphens only.</small>
-          <label for="new-org-type">Organization type</label>
-          <select id="new-org-type" required>
-            <option value="residential">Residential community</option>
-            <option value="campus">Campus</option>
-            <option value="educational">Educational institution</option>
-            <option value="public">Public / community location</option>
-          </select>
+          <small>Generated from the organization name. You can edit it using lowercase letters, numbers, and hyphens.</small>
           <button class="button button-primary" type="submit">Create organization</button>
         </form>
       </section>
@@ -97,7 +95,6 @@
         <label for="edit-org-type">Organization type</label>
         <select id="edit-org-type" required>
           <option value="residential">Residential community</option>
-          <option value="campus">Campus</option>
           <option value="educational">Educational institution</option>
           <option value="public">Public / community location</option>
         </select>
@@ -108,7 +105,7 @@
           <p>Your verified Google Workspace domain is used to associate this admin account with the organization.</p>
           <label for="organization-address">Organization address</label>
           <input id="organization-address" type="text" maxlength="250" autocomplete="street-address">
-          <label for="edit-place-search">Find the organization or location</label>
+          <label for="edit-place-search">Select organization location</label>
           <div class="place-search">
             <div class="place-search-input-row">
               <input id="edit-place-search" type="search" placeholder="Search places" autocomplete="off" aria-autocomplete="list" aria-controls="edit-place-results" aria-expanded="false">
@@ -169,8 +166,8 @@
     </section>
 
     <footer>
-      <p><a href="/about">IGotU</a> · Organization support pages</p>
-      <p class="privacy-note">Workspace sign-in is required to edit pages. Public contact details are visible to page visitors.</p>
+      <p><a href="/about">IGotU</a> · Create an Organization Support Page</p>
+      <p class="privacy-note">Workspace sign-in is required to manage pages. Published support contacts are visible to anyone with the page link.</p>
     </footer>
   </main>
   <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false">
