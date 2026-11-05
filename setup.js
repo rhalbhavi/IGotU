@@ -102,12 +102,15 @@ async function signInToWorkspace() {
     await signOut(auth);
     setStatus("Verification email sent. Click its link to verify your email and finish signing in with Google.");
   } catch (error) {
-    if (!alreadyVerified) {
+    const popupWasClosed = ["auth/popup-closed-by-user", "auth/cancelled-popup-request"].includes(error.code);
+    if (popupWasClosed || !alreadyVerified) {
       workspaceIdToken = "";
       workspaceDomain = "";
       await signOut(auth).catch(() => {});
     }
-    setStatus(error.message || "Google sign-in failed.");
+    setStatus(popupWasClosed
+      ? "Google sign-in cancelled. Click Continue with Google to choose an account."
+      : error.message || "Google sign-in failed.");
   }
 }
 
