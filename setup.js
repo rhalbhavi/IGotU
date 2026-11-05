@@ -20,9 +20,14 @@ let selectedOrganization;
 let slugManuallyEdited = false;
 let workspaceIdToken = "";
 let workspaceDomain = "";
-const placeMaps = new Map();
+const placeSearches = new Set();
 let nominatimQueue = Promise.resolve();
 let lastNominatimRequestAt = 0;
+const osmPlaceProvider = window.GeoSearch
+  ? new window.GeoSearch.OpenStreetMapProvider({
+      params: { limit: 8, "accept-language": document.documentElement.lang || "en" }
+    })
+  : null;
 
 document.querySelector("#slug-origin").textContent = `${window.location.origin}/`;
 
@@ -53,10 +58,9 @@ async function signInToWorkspace() {
     workspaceIdToken = googleCredential.idToken;
     const result = await apiRequest("/api/auth/workspace", "POST");
     workspaceDomain = result.domain;
-    document.querySelector("#workspace-domain").textContent = workspaceDomain;
     dashboard.hidden = false;
     authPanel.hidden = true;
-    initializePlacePicker("create-place-map", (place) => {
+    initializePlaceSearch("create-place", (place) => {
       document.querySelector("#new-org-address").value = place.address;
       const nameInput = document.querySelector("#new-org-name");
       if (!nameInput.value.trim()) {
@@ -64,9 +68,12 @@ async function signInToWorkspace() {
         nameInput.dispatchEvent(new Event("input", { bubbles: true }));
       }
     });
+    initializePlaceSearch("edit-place", (place) => {
+      document.querySelector("#organization-address").value = place.address;
+    });
     document.querySelector("#account-email").textContent = credential.user.email || "";
     await loadOrganizations();
-    setStatus(`Signed in with the ${workspaceDomain} Google Workspace domain.`);
+    setStatus("Signed in with your organization's Google Workspace account.");
   } catch (error) {
     if (!alreadyVerified) {
       workspaceIdToken = "";
@@ -219,11 +226,7 @@ function showOrganization(organization) {
   const publishOption = document.querySelector("#publish-organization");
   publishOption.checked = organization.published;
   document.querySelector("#organization-address").value = organization.address || "";
-  initializePlacePicker("edit-place-map", (place) => {
-    document.querySelector("#organization-address").value = place.address;
-  });
   document.querySelector("#organization-website").value = organization.website || "";
-  document.querySelector("#workspace-domain").textContent = organization.workspaceDomain || workspaceDomain;
   for (const key of ["security", "medical", "counselor"]) {
     const contact = organization.contacts?.[key] || {};
     document.querySelector(`#${key}-label`).value = contact.label || "";
@@ -316,52 +319,98 @@ function setStatus(message) {
   status.textContent = message;
 }
 
-function initializePlacePicker(containerId, onPlaceSelected) {
-  const container = document.getElementById(containerId);
-  if (!container || placeMaps.has(containerId)) return;
-  if (!window.L || !window.GeoSearch) {
-    container.hidden = true;
-    setStatus("The place search map could not load. You can still enter the address manually.");
-    return;
-  }
+function initializePlaceSearch(prefix, onPlaceSelected) {
+  if (placeSearches.has(prefix)) return;
+  const input = document.getElementById(`${prefix}-search`);
+  const button = document.getElementById(`${prefix}-search-button`);
+  const results = document.getElementById(`${prefix}-results`);
+  if (!input || !button || !results) return;
+  let searchSequence = 0;
 
-  const map = window.L.map(container).setView([20.5937, 78.9629], 5);
-  window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  }).addTo(map);
+  async function searchPlaces() {
+    const currentSequence = ++searchSequence;
+    const query = input.value.trim();
+    if (!query) {
+      showPlaceMessage(results, input, "Enter a place name to search.");
+      return;
+    }
+    if (!osmPlaceProvider) {
+      showPlaceMessage(results, input, "Place search is unavailable. Enter the address manually.");
+      return;
+    }
 
-  const osmProvider = new window.GeoSearch.OpenStreetMapProvider({
-    params: { "accept-language": document.documentElement.lang || "en" }
-  });
-  const provider = {
-    search(query) {
+    button.disabled = true;
+    button.textContent = "Searching…";
+    showPlaceMessage(results, input, "Searching places…");
+    try {
       const request = nominatimQueue.then(async () => {
         const wait = Math.max(0, 1100 - (Date.now() - lastNominatimRequestAt));
         if (wait) await new Promise((resolve) => window.setTimeout(resolve, wait));
         lastNominatimRequestAt = Date.now();
-        return osmProvider.search(query);
+        return osmPlaceProvider.search({ query });
       });
       nominatimQueue = request.catch(() => {});
-      return request;
+      const locations = await request;
+      if (currentSequence !== searchSequence) return;
+      results.replaceChildren();
+      if (!locations.length) {
+        showPlaceMessage(results, input, "No locations found. Try a more specific search.");
+        return;
+      }
+      for (const location of locations) {
+        const option = document.createElement("button");
+        option.type = "button";
+        option.className = "place-search-option";
+        option.setAttribute("role", "option");
+        option.textContent = location.label;
+        option.addEventListener("click", () => {
+          const address = (location.label || "").trim();
+          if (!address) return;
+          onPlaceSelected({
+            name: location.raw?.name || address.split(",")[0],
+            address
+          });
+          results.hidden = true;
+          input.setAttribute("aria-expanded", "false");
+        });
+        results.append(option);
+      }
+      results.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+    } catch {
+      if (currentSequence === searchSequence) {
+        showPlaceMessage(results, input, "Place search failed. You can enter the address manually.");
+      }
+    } finally {
+      if (currentSequence === searchSequence) {
+        button.disabled = false;
+        button.textContent = "Search";
+      }
     }
-  };
-  const search = new window.GeoSearch.GeoSearchControl({
-    provider,
-    style: "bar",
-    autoComplete: false,
-    searchLabel: "Search places",
-    keepResult: true,
-    showMarker: true,
-    retainZoomLevel: false
+  }
+
+  button.addEventListener("click", searchPlaces);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      searchPlaces();
+    }
   });
-  map.addControl(search);
-  map.on("geosearch/showlocation", ({ location }) => {
-    const address = (location.label || "").trim();
-    if (!address) return;
-    const placeName = location.raw?.name || address.split(",")[0];
-    onPlaceSelected({ name: placeName, address });
+  input.addEventListener("input", () => {
+    searchSequence += 1;
+    button.disabled = false;
+    button.textContent = "Search";
+    results.hidden = true;
+    input.setAttribute("aria-expanded", "false");
   });
-  placeMaps.set(containerId, map);
-  requestAnimationFrame(() => map.invalidateSize());
+  placeSearches.add(prefix);
+}
+
+function showPlaceMessage(results, input, message) {
+  const item = document.createElement("p");
+  item.className = "place-search-message";
+  item.textContent = message;
+  results.replaceChildren(item);
+  results.hidden = false;
+  input.setAttribute("aria-expanded", "true");
 }

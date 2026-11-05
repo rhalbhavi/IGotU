@@ -311,13 +311,16 @@ footer strong { color: var(--brand); }
 .organization-picker-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .organization-picker-row h2 { margin: 0; }
 .organization-picker-row select { width: min(55%, 390px); min-height: 46px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--surface); }
-.place-map { width: 100%; height: 320px; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: #e7ece9; }
-.map-help { margin: 0 0 4px; }
-.leaflet-container { z-index: 0; font: inherit; }
-.leaflet-geosearch-bar { max-width: min(360px, calc(100% - 24px)); }
-.leaflet-geosearch-bar form { border-radius: 9px; }
-.leaflet-geosearch-bar form input { min-height: 40px; }
-.leaflet-control-geosearch form.open { max-width: min(360px, calc(100vw - 56px)); }
+.place-search { position: relative; z-index: 2; }
+.place-search-input-row { display: flex; gap: 8px; }
+.place-search-input-row input { min-width: 0; flex: 1; }
+.place-search-input-row .button { flex: 0 0 auto; }
+.place-search-results { position: absolute; top: calc(100% + 4px); right: 0; left: 0; z-index: 5; max-height: 280px; overflow-y: auto; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); box-shadow: var(--shadow); }
+.place-search-option { display: block; width: 100%; padding: 11px 13px; border: 0; color: var(--ink); background: transparent; text-align: left; cursor: pointer; }
+.place-search-option + .place-search-option { border-top: 1px solid var(--divider); }
+.place-search-option:hover, .place-search-option:focus-visible { background: var(--brand-soft); }
+.place-search-message { padding: 11px 13px; margin: 0; color: var(--muted); }
+.place-search[hidden], .place-search-results[hidden] { display: none; }
 .google-sign-in-button { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; gap: 10px; }
 .admin-panel h2 { margin-bottom: 7px; font-size: calc(1.25rem + 2px); }
 .admin-panel > p { color: var(--muted); font-size: calc(.86rem + 2px); }
