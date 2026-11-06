@@ -93,14 +93,14 @@ function clearPendingVerification() {
 
 async function isUserVerified(user) {
   if (!user) return false;
-  // 1. Check local storage verified UID flag
+  // 1. Check local storage verified UID flag (set only after server confirms)
   if (localStorage.getItem(`igotu_verified_uid_${user.uid}`) === "true") {
     return true;
   }
 
-  // 2. Check custom claim on ID token
+  // 2. Force-refresh ID token and check custom claim
   try {
-    const tokenResult = await user.getIdTokenResult();
+    const tokenResult = await user.getIdTokenResult(true);
     if (tokenResult?.claims?.igotu_verified) {
       localStorage.setItem(`igotu_verified_uid_${user.uid}`, "true");
       return true;
@@ -109,7 +109,7 @@ async function isUserVerified(user) {
     console.warn("getIdTokenResult check error:", e);
   }
 
-  // 3. Ask server status endpoint
+  // 3. Ask server status endpoint — always the authoritative source
   try {
     const res = await apiRequest("/api/auth/status", "GET");
     if (res?.verified) {
@@ -120,16 +120,16 @@ async function isUserVerified(user) {
     console.warn("api/auth/status check error:", e);
   }
 
-  // 4. Check if user verified via Firebase email action while awaiting verification
-  const wasAwaiting = Boolean(
-    sessionStorage.getItem(`igotu_awaiting_verification_${user.uid}`) ||
-    getPendingVerification()?.email ||
-    (verifyAccountPanel && !verifyAccountPanel.hidden)
-  );
+  // 4. Only trust emailVerified if the URL contains the ?verified=true redirect
+  //    AND there is an active session key for THIS specific UID awaiting verification.
+  //    Never rely on a stale pending-verification entry from a previous/deleted account.
   const urlParams = new URLSearchParams(window.location.search);
   const isVerifiedParam = urlParams.get("verified") === "true";
+  const isAwaitingThisUid = Boolean(
+    sessionStorage.getItem(`igotu_awaiting_verification_${user.uid}`)
+  );
 
-  if ((wasAwaiting || isVerifiedParam) && user.emailVerified) {
+  if ((isVerifiedParam || isAwaitingThisUid) && user.emailVerified) {
     return true;
   }
 
@@ -485,8 +485,29 @@ async function signInToWorkspace() {
     localStorage.setItem("igotu-workspace-id-token", workspaceIdToken);
     localStorage.setItem(emailForSignInStorageKey, email);
 
-    // Check if the user is already verified in IGotU
+    // Detect freshly-created accounts (re-registration after deletion from Firebase Console).
+    // If the account was created within the last 30 seconds it is brand-new; purge any stale
+    // local flags and ask the server to wipe any old verified_admins record for this email/UID
+    // so the user is treated as new and unverified.
     await credential.user.reload().catch(() => {});
+    const uid = credential.user.uid;
+    const creationTime = credential.user.metadata?.creationTime;
+    const accountAgeMs = creationTime ? Date.now() - new Date(creationTime).getTime() : Infinity;
+    if (accountAgeMs < 30_000) {
+      // New account — scrub all local verification state for any UID that shares this email
+      localStorage.removeItem(`igotu_verified_uid_${uid}`);
+      localStorage.removeItem(`igotu_sent_verification_${uid}`);
+      sessionStorage.removeItem(`igotu_awaiting_verification_${uid}`);
+      clearPendingVerification();
+      // Ask server to reset any stale verified_admins record keyed to this email
+      try {
+        await apiRequest("/api/auth/reset-account", "POST");
+      } catch (e) {
+        console.warn("reset-account notice:", e);
+      }
+    }
+
+    // Check if the user is already verified in IGotU
     const verified = await isUserVerified(credential.user);
     if (verified) {
       clearPendingVerification();
@@ -584,6 +605,23 @@ async function completeEmailLinkSignIn(email) {
     signedInUser = credential.user;
     localStorage.removeItem(emailForSignInStorageKey);
     window.history.replaceState({}, document.title, window.location.pathname);
+
+    // If this is a brand-new account (re-registered after deletion), reset stale data.
+    const uid = credential.user.uid;
+    const creationTime = credential.user.metadata?.creationTime;
+    const accountAgeMs = creationTime ? Date.now() - new Date(creationTime).getTime() : Infinity;
+    if (accountAgeMs < 30_000) {
+      localStorage.removeItem(`igotu_verified_uid_${uid}`);
+      localStorage.removeItem(`igotu_sent_verification_${uid}`);
+      sessionStorage.removeItem(`igotu_awaiting_verification_${uid}`);
+      clearPendingVerification();
+      try {
+        await apiRequest("/api/auth/reset-account", "POST");
+      } catch (e) {
+        console.warn("reset-account notice:", e);
+      }
+    }
+
     await triggerVerificationSuccessTransition(credential.user);
     signedInUser = null;
   } catch (error) {
@@ -746,6 +784,28 @@ async function handleAuthState(user) {
       await user.reload();
     } catch (e) {
       console.warn("Could not reload user in auth state change:", e);
+    }
+
+    // If this account was just created (e.g. re-registration after Firebase deletion),
+    // purge any stale local verified flags and reset server-side data.
+    const uid = user.uid;
+    const creationTime = user.metadata?.creationTime;
+    const accountAgeMs = creationTime ? Date.now() - new Date(creationTime).getTime() : Infinity;
+    if (accountAgeMs < 30_000 && !sessionStorage.getItem(`igotu_new_account_reset_${uid}`)) {
+      sessionStorage.setItem(`igotu_new_account_reset_${uid}`, "true");
+      localStorage.removeItem(`igotu_verified_uid_${uid}`);
+      localStorage.removeItem(`igotu_sent_verification_${uid}`);
+      sessionStorage.removeItem(`igotu_awaiting_verification_${uid}`);
+      clearPendingVerification();
+      try {
+        const token = await user.getIdToken(true);
+        await fetch("/api/auth/reset-account", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch (e) {
+        console.warn("reset-account in authState notice:", e);
+      }
     }
 
     if (isVerifiedRedirect) {
