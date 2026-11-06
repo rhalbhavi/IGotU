@@ -21,6 +21,16 @@ const emailSignInForm = document.querySelector("#email-sign-in-form");
 const emailSignInAddress = document.querySelector("#email-sign-in-address");
 const organizationForm = document.querySelector("#organization-form");
 const createOrganizationForm = document.querySelector("#create-org-form");
+const verifyAccountPanel = document.querySelector("#verify-account-panel");
+const verifiedSuccessPanel = document.querySelector("#verified-success-panel");
+const verifyEmailDisplay = document.querySelector("#verify-email-display");
+const verifyInstructionText = document.querySelector("#verify-instruction-text");
+const verifyEmailFallback = document.querySelector("#verify-email-fallback");
+const verifyEmailConfirmInput = document.querySelector("#verify-email-confirm-input");
+const verifyEmailConfirmButton = document.querySelector("#verify-email-confirm-button");
+const resendVerificationButton = document.querySelector("#resend-verification-button");
+const changeEmailButton = document.querySelector("#change-email-button");
+const verifyStatus = document.querySelector("#verify-status");
 let auth;
 let organizations = [];
 let selectedOrganization;
@@ -52,13 +62,18 @@ if (!isFirebaseConfigured) {
   auth = getAuth(initializeApp(firebaseConfig));
   onAuthStateChanged(auth, handleAuthState);
   if (isSignInWithEmailLink(auth, window.location.href)) {
-    emailSignInForm.hidden = false;
+    authPanel.hidden = true;
+    dashboard.hidden = true;
     const savedEmail = localStorage.getItem(emailForSignInStorageKey);
     if (savedEmail) {
-      emailSignInAddress.value = savedEmail;
+      showVerifyAccountScreen(savedEmail);
+      setVerifyStatus("Verifying your email address…");
       completeEmailLinkSignIn(savedEmail);
     } else {
-      setStatus("Enter the organization email address that received the sign-in link.", "error");
+      showVerifyAccountScreen("");
+      verifyEmailFallback.hidden = false;
+      verifyInstructionText.textContent = "Please confirm the organization email address you received the link on to complete verification.";
+      verifyEmailConfirmInput.focus();
     }
   }
 }
@@ -70,6 +85,76 @@ emailSignInButton.addEventListener("click", () => {
   emailSignInAddress.focus();
 });
 emailSignInForm.addEventListener("submit", handleEmailSignIn);
+
+resendVerificationButton?.addEventListener("click", async () => {
+  const email = localStorage.getItem(emailForSignInStorageKey) || emailSignInAddress.value.trim().toLowerCase();
+  if (!email) {
+    showAuthScreen();
+    return;
+  }
+  setVerifyStatus("Resending verification email…");
+  try {
+    await sendSignInLinkToEmail(auth, email, {
+      url: `${window.location.origin}${window.location.pathname}`,
+      handleCodeInApp: true
+    });
+    setVerifyStatus("Verification email resent! Please check your inbox and spam folder.");
+  } catch (error) {
+    setVerifyStatus(error.message || "Failed to resend verification email.", "error");
+  }
+});
+
+changeEmailButton?.addEventListener("click", () => {
+  showAuthScreen();
+});
+
+verifyEmailConfirmButton?.addEventListener("click", () => {
+  const confirmedEmail = verifyEmailConfirmInput.value.trim().toLowerCase();
+  if (!confirmedEmail) {
+    setVerifyStatus("Enter your organization email address.", "error");
+    return;
+  }
+  completeEmailLinkSignIn(confirmedEmail);
+});
+
+verifyEmailConfirmInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    verifyEmailConfirmButton.click();
+  }
+});
+
+function setVerifyStatus(message, type = "info") {
+  if (!verifyStatus) return;
+  verifyStatus.textContent = message || "";
+  if (type === "error") {
+    verifyStatus.classList.add("is-error");
+  } else {
+    verifyStatus.classList.remove("is-error");
+  }
+}
+
+function showVerifyAccountScreen(email) {
+  authPanel.hidden = true;
+  dashboard.hidden = true;
+  if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
+  if (verifyAccountPanel) verifyAccountPanel.hidden = false;
+  if (verifyEmailFallback) verifyEmailFallback.hidden = true;
+  if (verifyEmailDisplay) verifyEmailDisplay.textContent = email || "your address";
+  if (verifyInstructionText) {
+    verifyInstructionText.innerHTML = `Please check your inbox (and spam or junk folder) and click the <strong>VERIFY EMAIL</strong> button in that email to continue.`;
+  }
+  setVerifyStatus("");
+}
+
+function showAuthScreen() {
+  if (verifyAccountPanel) verifyAccountPanel.hidden = true;
+  if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
+  dashboard.hidden = true;
+  authPanel.hidden = false;
+  emailSignInForm.hidden = false;
+  emailSignInAddress.focus();
+}
 
 function parseJwtPayload(token) {
   try {
@@ -179,11 +264,13 @@ async function handleEmailSignIn(event) {
       return;
     }
     localStorage.setItem(emailForSignInStorageKey, email);
+    setStatus("Sending verification email…");
     await sendSignInLinkToEmail(auth, email, {
       url: `${window.location.origin}${window.location.pathname}`,
       handleCodeInApp: true
     });
-    setStatus("Verification email sent. Open its sign-in link to verify your address and continue.");
+    setStatus("");
+    showVerifyAccountScreen(email);
   } catch (error) {
     if (error.code === "auth/operation-not-allowed") {
       setStatus("Email sign-in is not enabled for this project yet.", "error");
@@ -195,13 +282,31 @@ async function handleEmailSignIn(event) {
 
 async function completeEmailLinkSignIn(email) {
   let signedInUser = null;
+  if (verifyAccountPanel && !verifyAccountPanel.hidden) {
+    setVerifyStatus("Verifying your email address…");
+  } else {
+    setStatus("Verifying your email address…");
+  }
+
   try {
     const credential = await signInWithEmailLink(auth, email, window.location.href);
     signedInUser = credential.user;
     localStorage.removeItem(emailForSignInStorageKey);
     window.history.replaceState({}, document.title, window.location.pathname);
-    await connectSignedInUser(credential.user);
+    await connectSignedInUser(credential.user, { deferDashboard: true });
     signedInUser = null;
+
+    // Show verification success screen with large green check mark in light green circle
+    authPanel.hidden = true;
+    if (verifyAccountPanel) verifyAccountPanel.hidden = true;
+    dashboard.hidden = true;
+    if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = false;
+
+    // After 2 seconds navigate to dashboard screen
+    setTimeout(() => {
+      if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
+      dashboard.hidden = false;
+    }, 2000);
   } catch (error) {
     if (signedInUser) {
       try {
@@ -211,15 +316,21 @@ async function completeEmailLinkSignIn(email) {
       }
     }
     await signOut(auth).catch(() => {});
+    showAuthScreen();
     setStatus(error.message || "That sign-in link is invalid or expired. Request a new one.", "error");
   }
 }
 
-async function connectSignedInUser(user) {
+async function connectSignedInUser(user, options = {}) {
+  const { deferDashboard = false } = options;
   const result = await apiRequest("/api/auth/workspace", "POST");
   workspaceDomain = result.domain;
-  dashboard.hidden = false;
-  authPanel.hidden = true;
+  if (!deferDashboard) {
+    dashboard.hidden = false;
+    authPanel.hidden = true;
+    if (verifyAccountPanel) verifyAccountPanel.hidden = true;
+    if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
+  }
   initializePlaceSearch("create-place", (place) => {
     document.querySelector("#new-org-address").value = place.address;
     const nameInput = document.querySelector("#new-org-name");
@@ -333,6 +444,8 @@ async function handleAuthState(user) {
     workspaceIdToken = "";
     workspaceDomain = "";
     authPanel.hidden = false;
+    if (verifyAccountPanel) verifyAccountPanel.hidden = true;
+    if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
     organizationForm.hidden = true;
     setStatus("");
     return;
@@ -350,12 +463,16 @@ async function handleAuthState(user) {
     workspaceDomain = "";
     await signOut(auth).catch(() => {});
     authPanel.hidden = false;
+    if (verifyAccountPanel) verifyAccountPanel.hidden = true;
+    if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
     organizationForm.hidden = true;
     setStatus("Use your organization's Google Workspace account. Personal Gmail accounts aren't accepted.", "error");
     return;
   }
 
   authPanel.hidden = false;
+  if (verifyAccountPanel) verifyAccountPanel.hidden = true;
+  if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
   organizationForm.hidden = true;
   setStatus("Sign in again with Google or verify your organization email for this session.", "error");
 }

@@ -332,6 +332,26 @@ footer strong { color: var(--brand); }
 .email-sign-in-row input { min-width: 0; min-height: 48px; flex: 1; padding: 10px 12px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--surface); }
 .email-sign-in-row .button { flex: 0 0 auto; }
 .email-sign-in-form small { display: block; margin-top: 6px; color: var(--muted); }
+.verify-panel { max-width: 560px; margin: 24px auto; padding: 36px 28px; text-align: center; }
+.verify-icon-circle { display: grid; place-items: center; width: 76px; height: 76px; margin: 0 auto 18px; border-radius: 50%; color: var(--brand); background: var(--brand-soft); border: 2px solid var(--line); }
+.verify-icon-circle .material-symbols-rounded { font-size: 40px; }
+.verify-panel h2 { margin: 0 0 10px; font-size: calc(1.4rem + 2px); color: var(--ink); }
+.verify-body { margin: 0 0 10px; color: var(--ink) !important; font-size: calc(.95rem + 2px) !important; }
+.verify-body strong { color: var(--brand); overflow-wrap: anywhere; }
+.verify-instruction { margin: 0 0 20px; color: var(--muted) !important; font-size: calc(.85rem + 2px) !important; line-height: 1.55; }
+.verify-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 18px; }
+.verify-actions .button { width: 100%; max-width: 300px; }
+.button-link { display: inline-flex; align-items: center; justify-content: center; padding: 8px 14px; border: none; background: transparent; color: var(--brand); font-size: calc(.84rem + 2px); font-weight: 700; cursor: pointer; text-decoration: underline; transition: color .2s ease; }
+.button-link:hover { color: var(--brand-dark); }
+:root[data-theme="dark"] .button-link { color: #8ed8c2; }
+.success-panel { max-width: 500px; margin: 32px auto; padding: 44px 28px; text-align: center; }
+.success-circle { display: grid; place-items: center; width: 96px; height: 96px; margin: 0 auto 20px; border-radius: 50%; background: #dcfce7; border: 3px solid #86efac; box-shadow: 0 10px 28px rgba(22, 163, 74, 0.16); animation: checkPop .45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+.success-circle .success-icon { font-size: 58px; color: #16a34a; font-weight: 800; line-height: 1; }
+.success-heading { margin: 0 0 8px; font-size: calc(1.48rem + 2px); font-weight: 800; letter-spacing: -.03em; color: var(--ink); }
+.success-subtext { margin: 0; color: var(--muted) !important; font-size: calc(.88rem + 2px) !important; }
+:root[data-theme="dark"] .success-circle { background: #143825; border-color: #22c55e; box-shadow: 0 10px 28px rgba(34, 197, 94, 0.22); }
+:root[data-theme="dark"] .success-circle .success-icon { color: #4ade80; }
+@keyframes checkPop { 0% { transform: scale(0.5); opacity: 0; } 70% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 .admin-panel { padding: 22px; margin: 16px 0; border: 1px solid var(--divider); border-radius: 18px; background: var(--surface); }
 .place-search { position: relative; z-index: 2; }
 .place-search-input-row { display: flex; gap: 8px; }

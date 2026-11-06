@@ -59,6 +59,41 @@
       <p id="auth-status" class="admin-status" role="status" aria-live="polite"></p>
     </section>
 
+    <!-- Verify Your Account Panel -->
+    <section id="verify-account-panel" class="admin-panel verify-panel" hidden aria-labelledby="verify-account-title">
+      <div class="verify-icon-circle">
+        <span class="material-symbols-rounded" aria-hidden="true">mark_email_unread</span>
+      </div>
+      <h2 id="verify-account-title">Verify Your Account</h2>
+      <p class="verify-body">
+        A verification email has been sent to your inbox at <strong id="verify-email-display"></strong>.
+      </p>
+      <p class="verify-instruction" id="verify-instruction-text">
+        Please check your inbox (and spam or junk folder) and click the <strong>VERIFY EMAIL</strong> button in that email to continue.
+      </p>
+      <div id="verify-email-fallback" class="email-sign-in-form" hidden>
+        <label for="verify-email-confirm-input">Confirm your organization email address</label>
+        <div class="email-sign-in-row">
+          <input id="verify-email-confirm-input" type="email" autocomplete="email" placeholder="name@your-organization.org">
+          <button class="button button-primary" id="verify-email-confirm-button" type="button">Verify</button>
+        </div>
+      </div>
+      <div class="verify-actions">
+        <button class="button button-secondary" id="resend-verification-button" type="button">Resend verification email</button>
+        <button class="button-link" id="change-email-button" type="button">Use a different email address</button>
+      </div>
+      <p id="verify-status" class="admin-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- Email Verified Success Panel -->
+    <section id="verified-success-panel" class="admin-panel verify-panel success-panel" hidden aria-labelledby="verified-success-title">
+      <div class="success-circle">
+        <span class="material-symbols-rounded success-icon" aria-hidden="true">check</span>
+      </div>
+      <h2 id="verified-success-title" class="success-heading">Email verified successfully!</h2>
+      <p class="success-subtext">Navigating to your dashboard…</p>
+    </section>
+
     <section id="dashboard" hidden>
       <div class="admin-panel admin-account">
         <div>
