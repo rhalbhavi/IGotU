@@ -315,9 +315,9 @@ footer strong { color: var(--brand); }
 .admin-page-heading { margin: 0 0 22px; text-align: center; }
 .admin-page-heading h2 { margin: 8px 0 10px; font-size: clamp(calc(1.55rem + 2px), calc(6vw + 2px), calc(2rem + 2px)); line-height: 1.15; letter-spacing: -.045em; }
 .admin-page-heading p { padding-top: 3px; color: var(--ink); }
-.admin-status { padding: 12px 15px; border: 1px solid var(--divider); border-radius: 12px; color: var(--muted); background: var(--brand-soft); }
+.admin-status { padding: 12px 15px; border: 1px solid var(--divider); border-radius: 12px; color: var(--muted); background: var(--brand-soft); font-size: 18px; }
 .admin-status:empty { display: none; }
-#auth-status { margin-top: 10px; }
+#auth-status { margin-top: 10px; font-size: 18px; }
 #auth-status.is-error { border-color: #f0d3d0; color: var(--danger); background: var(--danger-bg); }
 .auth-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; margin-top: 18px; }
 .auth-actions .button { min-width: 220px; }
@@ -365,7 +365,7 @@ footer strong { color: var(--brand); }
 .place-search[hidden], .place-search-results[hidden] { display: none; }
 .google-sign-in-button { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; gap: 10px; }
 .admin-panel h2 { margin-bottom: 7px; font-size: calc(1.25rem + 2px); }
-.admin-panel > p, .admin-form p { color: var(--muted); font-size: 1rem; line-height: 1.5; }
+.admin-panel > p, .admin-form p { color: var(--muted); font-size: 18px; line-height: 1.5; }
 .admin-form { display: grid; gap: 8px; }
 .admin-form label, .admin-panel > label { margin-top: 7px; font-size: calc(.82rem + 4px); font-weight: 800; }
 .admin-form input, .admin-form select, .admin-panel select { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--surface); }
