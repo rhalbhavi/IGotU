@@ -1,10 +1,12 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
 import {
   GoogleAuthProvider,
+  applyActionCode,
   deleteUser,
   getAuth,
   isSignInWithEmailLink,
   onAuthStateChanged,
+  sendEmailVerification,
   sendSignInLinkToEmail,
   signInWithEmailLink,
   signInWithPopup,
@@ -35,7 +37,7 @@ let auth;
 let organizations = [];
 let selectedOrganization;
 let slugManuallyEdited = false;
-let workspaceIdToken = "";
+let workspaceIdToken = sessionStorage.getItem("igotu-workspace-id-token") || "";
 let workspaceDomain = "";
 const placeSearches = new Set();
 let nominatimQueue = Promise.resolve();
@@ -61,20 +63,15 @@ if (!isFirebaseConfigured) {
 } else {
   auth = getAuth(initializeApp(firebaseConfig));
   onAuthStateChanged(auth, handleAuthState);
-  if (isSignInWithEmailLink(auth, window.location.href)) {
-    authPanel.hidden = true;
-    dashboard.hidden = true;
-    const savedEmail = localStorage.getItem(emailForSignInStorageKey);
-    if (savedEmail) {
-      showVerifyAccountScreen(savedEmail);
-      setVerifyStatus("Verifying your email address…");
-      completeEmailLinkSignIn(savedEmail);
-    } else {
-      showVerifyAccountScreen("");
-      verifyEmailFallback.hidden = false;
-      verifyInstructionText.textContent = "Please confirm the organization email address you received the link on to complete verification.";
-      verifyEmailConfirmInput.focus();
-    }
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const authMode = urlParams.get("mode");
+  const actionCode = urlParams.get("oobCode");
+
+  if (authMode === "verifyEmail" && actionCode) {
+    handleEmailVerificationRedirect(actionCode);
+  } else if (isSignInWithEmailLink(auth, window.location.href)) {
+    handleEmailLinkSignInRedirect();
   }
 }
 
@@ -88,16 +85,22 @@ emailSignInForm.addEventListener("submit", handleEmailSignIn);
 
 resendVerificationButton?.addEventListener("click", async () => {
   const email = localStorage.getItem(emailForSignInStorageKey) || emailSignInAddress.value.trim().toLowerCase();
-  if (!email) {
-    showAuthScreen();
-    return;
-  }
   setVerifyStatus("Resending verification email…");
   try {
-    await sendSignInLinkToEmail(auth, email, {
-      url: `${window.location.origin}${window.location.pathname}`,
-      handleCodeInApp: true
-    });
+    if (auth.currentUser) {
+      await sendEmailVerification(auth.currentUser, {
+        url: `${window.location.origin}${window.location.pathname}`,
+        handleCodeInApp: true
+      });
+    } else if (email) {
+      await sendSignInLinkToEmail(auth, email, {
+        url: `${window.location.origin}${window.location.pathname}`,
+        handleCodeInApp: true
+      });
+    } else {
+      showAuthScreen();
+      return;
+    }
     setVerifyStatus("Verification email resent! Please check your inbox and spam folder.");
   } catch (error) {
     setVerifyStatus(error.message || "Failed to resend verification email.", "error");
@@ -154,6 +157,60 @@ function showAuthScreen() {
   authPanel.hidden = false;
   emailSignInForm.hidden = false;
   emailSignInAddress.focus();
+}
+
+async function handleEmailVerificationRedirect(actionCode) {
+  authPanel.hidden = true;
+  dashboard.hidden = true;
+  showVerifyAccountScreen("");
+  setVerifyStatus("Verifying your email address…");
+
+  try {
+    await applyActionCode(auth, actionCode);
+    if (auth.currentUser) {
+      await auth.currentUser.reload();
+      await connectSignedInUser(auth.currentUser, { deferDashboard: true });
+    }
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    // Show large green check mark icon in middle inside light green circle and below Email verified successfully!
+    authPanel.hidden = true;
+    if (verifyAccountPanel) verifyAccountPanel.hidden = true;
+    dashboard.hidden = true;
+    if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = false;
+
+    // After 2 seconds navigate to dashboard screen
+    setTimeout(() => {
+      if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
+      if (auth.currentUser) {
+        dashboard.hidden = false;
+      } else {
+        showAuthScreen();
+        setStatus("Email verified successfully! Sign in to access your dashboard.");
+      }
+    }, 2000);
+  } catch (error) {
+    showAuthScreen();
+    setStatus(error.message || "Email verification failed or link has expired.", "error");
+  }
+}
+
+async function handleEmailLinkSignInRedirect() {
+  authPanel.hidden = true;
+  dashboard.hidden = true;
+  const savedEmail = localStorage.getItem(emailForSignInStorageKey);
+  if (savedEmail) {
+    showVerifyAccountScreen(savedEmail);
+    setVerifyStatus("Verifying your email address…");
+    completeEmailLinkSignIn(savedEmail);
+  } else {
+    showVerifyAccountScreen("");
+    if (verifyEmailFallback) verifyEmailFallback.hidden = false;
+    if (verifyInstructionText) {
+      verifyInstructionText.textContent = "Please confirm the organization email address you received the link on to complete verification.";
+    }
+    verifyEmailConfirmInput?.focus();
+  }
 }
 
 function parseJwtPayload(token) {
@@ -221,7 +278,21 @@ async function signInToWorkspace() {
     }
 
     workspaceIdToken = googleCredential.idToken;
-    await connectSignedInUser(credential.user);
+    sessionStorage.setItem("igotu-workspace-id-token", workspaceIdToken);
+    localStorage.setItem(emailForSignInStorageKey, email);
+
+    // Send verification email before taking them to the dashboard
+    setStatus("Sending verification email…");
+    try {
+      await sendEmailVerification(credential.user, {
+        url: `${window.location.origin}${window.location.pathname}`,
+        handleCodeInApp: true
+      });
+    } catch (emailErr) {
+      console.warn("sendEmailVerification notice:", emailErr);
+    }
+    setStatus("");
+    showVerifyAccountScreen(email);
     signedInUser = null;
   } catch (error) {
     if (signedInUser) {
@@ -235,6 +306,7 @@ async function signInToWorkspace() {
     if (popupWasClosed || !alreadyVerified) {
       workspaceIdToken = "";
       workspaceDomain = "";
+      sessionStorage.removeItem("igotu-workspace-id-token");
       await signOut(auth).catch(() => {});
     }
     const message = error.code === "auth/unauthorized-domain"
@@ -439,10 +511,13 @@ document.querySelector("#copy-page-link").addEventListener("click", async () => 
 
 async function handleAuthState(user) {
   if (user && (workspaceIdToken || workspaceDomain)) return;
+  if (verifyAccountPanel && !verifyAccountPanel.hidden) return;
+  if (verifiedSuccessPanel && !verifiedSuccessPanel.hidden) return;
   dashboard.hidden = true;
   if (!user) {
     workspaceIdToken = "";
     workspaceDomain = "";
+    sessionStorage.removeItem("igotu-workspace-id-token");
     authPanel.hidden = false;
     if (verifyAccountPanel) verifyAccountPanel.hidden = true;
     if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
