@@ -62,6 +62,15 @@ a { color: inherit; }
   object-fit: contain;
 }
 
+.brand a,
+.about-brand a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  line-height: 0;
+}
+
 .eyebrow {
   margin: 0 0 4px;
   color: var(--brand);

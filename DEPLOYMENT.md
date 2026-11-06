@@ -7,6 +7,7 @@ IGotU is a shared static site deployed on Vercel. Firebase Authentication signs 
 1. In Firebase Console, enable **Authentication → Sign-in method → Google**. Under **Authentication → Settings → Authorized domains**, add the exact hostname used to open the site, such as `your-project.vercel.app` (no `https://` or path). Add any Vercel preview or custom domains from which admins will sign in as well.
 2. Copy the Firebase Web app settings into `firebase-config.js`.
 3. In Google Cloud Console, get the OAuth 2.0 **Web application client ID** used by the Firebase Google sign-in provider.
+   Add the site's origin under that OAuth client’s **Authorized JavaScript origins** so Google Identity Services can show its account chooser. For local development, add the exact local origin (including port).
 4. Create a MongoDB Atlas database user restricted to the IGotU database and copy the Atlas connection string.
 5. In Vercel, open the IGotU project’s **Settings → Environment Variables** and add the following variables. Select **Production** and also **Preview** if you test sign-in on preview deployments:
 

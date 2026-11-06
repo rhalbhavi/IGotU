@@ -1,19 +1,12 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
 import {
-  applyActionCode,
-  checkActionCode,
   GoogleAuthProvider,
   getAuth,
-  getRedirectResult,
   isSignInWithEmailLink,
-  linkWithRedirect,
   onAuthStateChanged,
-  reauthenticateWithRedirect,
-  sendEmailVerification,
   sendSignInLinkToEmail,
   signInWithEmailLink,
   signInWithPopup,
-  signInWithRedirect,
   signOut
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js";
@@ -37,13 +30,17 @@ const placeSearches = new Set();
 let nominatimQueue = Promise.resolve();
 let lastNominatimRequestAt = 0;
 const emailForSignInStorageKey = "igotu-email-for-sign-in";
-const googleVerificationStorageKey = "igotu-google-verification-email";
-const pendingSignInMethodStorageKey = "igotu-pending-sign-in-method";
 const osmPlaceProvider = window.GeoSearch
   ? new window.GeoSearch.OpenStreetMapProvider({
       params: { limit: 8, "accept-language": document.documentElement.lang || "en" }
     })
   : null;
+
+if (window.location.hostname === "127.0.0.1") {
+  const localUrl = new URL(window.location.href);
+  localUrl.hostname = "localhost";
+  window.location.replace(localUrl.href);
+}
 
 document.querySelector("#slug-origin").textContent = `${window.location.origin}/`;
 
@@ -55,10 +52,6 @@ if (!isFirebaseConfigured) {
   onAuthStateChanged(auth, handleAuthState);
   if (isSignInWithEmailLink(auth, window.location.href)) {
     emailSignInForm.hidden = false;
-    const linkIntent = new URLSearchParams(window.location.search).get("continue");
-    if (["email", "google"].includes(linkIntent)) {
-      localStorage.setItem(pendingSignInMethodStorageKey, linkIntent);
-    }
     const savedEmail = localStorage.getItem(emailForSignInStorageKey);
     if (savedEmail) {
       emailSignInAddress.value = savedEmail;
@@ -66,35 +59,26 @@ if (!isFirebaseConfigured) {
     } else {
       setStatus("Enter the organization email address that received the sign-in link.", "error");
     }
-  } else if (
-    new URLSearchParams(window.location.search).get("finish") === "google-email-verification" ||
-    new URLSearchParams(window.location.search).get("mode") === "verifyEmail"
-  ) {
-    continueGoogleSignInAfterEmailVerification();
-  } else {
-    finishGoogleRedirectSignIn();
   }
 }
 
-document.querySelector("#google-sign-in").addEventListener("click", beginGoogleSignIn);
+document.querySelector("#google-sign-in").addEventListener("click", signInToWorkspace);
 document.querySelector("#refresh-google-session").addEventListener("click", signInToWorkspace);
 emailSignInButton.addEventListener("click", () => {
-  localStorage.setItem(pendingSignInMethodStorageKey, "email");
   emailSignInForm.hidden = false;
   emailSignInAddress.focus();
 });
 emailSignInForm.addEventListener("submit", handleEmailSignIn);
 
-function beginGoogleSignIn() {
-  if (!auth) return;
-  localStorage.setItem(pendingSignInMethodStorageKey, "google");
-  emailSignInForm.hidden = false;
-  emailSignInAddress.focus();
-  setStatus("Enter your organization email address. After you verify it by email, you'll choose your Google Workspace account.");
-}
-
 async function signInToWorkspace() {
   if (!auth) return;
+  if (window.location.hostname === "127.0.0.1") {
+    const localUrl = new URL(window.location.href);
+    localUrl.hostname = "localhost";
+    window.location.replace(localUrl.href);
+    return;
+  }
+  emailSignInForm.hidden = true;
   const alreadyVerified = Boolean(workspaceIdToken);
   if (!alreadyVerified) {
     await signOut(auth).catch(() => {});
@@ -112,15 +96,8 @@ async function signInToWorkspace() {
     if (!googleCredential?.idToken) {
       throw new Error("Google did not return an identity token. Check the Firebase Google provider setup.");
     }
-    await sendEmailVerification(credential.user, {
-      url: `${window.location.origin}${window.location.pathname}?finish=google-email-verification`,
-      handleCodeInApp: true
-    });
-    localStorage.setItem(googleVerificationStorageKey, credential.user.email?.toLowerCase() || "");
-    workspaceIdToken = "";
-    workspaceDomain = "";
-    await signOut(auth);
-    setStatus("Verification email sent. Click its link to verify your email and finish signing in with Google.");
+    workspaceIdToken = googleCredential.idToken;
+    await connectSignedInUser(credential.user);
   } catch (error) {
     const popupWasClosed = ["auth/popup-closed-by-user", "auth/cancelled-popup-request"].includes(error.code);
     if (popupWasClosed || !alreadyVerified) {
@@ -129,7 +106,9 @@ async function signInToWorkspace() {
       await signOut(auth).catch(() => {});
     }
     const message = error.code === "auth/unauthorized-domain"
-      ? `This site (${window.location.hostname}) is not authorized for Firebase sign-in. Add this hostname in Firebase Console under Authentication → Settings → Authorized domains, then try again.`
+      ? (window.location.hostname === "127.0.0.1"
+          ? `This site (127.0.0.1) is not authorized in Firebase. Use http://localhost:${window.location.port || "5500"}${window.location.pathname} instead (authorized by default), or add 127.0.0.1 in Firebase Console under Authentication → Settings → Authorized domains.`
+          : `This site (${window.location.hostname}) is not authorized for Firebase sign-in. Add this hostname in Firebase Console under Authentication → Settings → Authorized domains, then try again.`)
       : error.message || "Google sign-in failed.";
     setStatus(popupWasClosed
       ? "Google sign-in cancelled. Click Continue with Google to choose an account."
@@ -142,7 +121,6 @@ async function handleEmailSignIn(event) {
   if (!auth) return;
   const email = emailSignInAddress.value.trim().toLowerCase();
   const emailDomain = email.split("@").pop();
-  const signInMethod = localStorage.getItem(pendingSignInMethodStorageKey) || "email";
   if (!email || emailDomain === "gmail.com" || emailDomain === "googlemail.com") {
     setStatus("Use your organization's email address. Personal Gmail accounts aren't accepted.", "error");
     return;
@@ -154,14 +132,11 @@ async function handleEmailSignIn(event) {
       return;
     }
     localStorage.setItem(emailForSignInStorageKey, email);
-    localStorage.setItem(pendingSignInMethodStorageKey, signInMethod);
     await sendSignInLinkToEmail(auth, email, {
-      url: `${window.location.origin}${window.location.pathname}?continue=${encodeURIComponent(signInMethod)}`,
+      url: `${window.location.origin}${window.location.pathname}`,
       handleCodeInApp: true
     });
-    setStatus(signInMethod === "google"
-      ? "Verification email sent. Open its link to verify your address, then choose your Google Workspace account."
-      : "Verification email sent. Open its sign-in link to verify your address and continue.");
+    setStatus("Verification email sent. Open its sign-in link to verify your address and continue.");
   } catch (error) {
     if (error.code === "auth/operation-not-allowed") {
       setStatus("Email sign-in is not enabled for this project yet.", "error");
@@ -171,77 +146,11 @@ async function handleEmailSignIn(event) {
   }
 }
 
-async function continueGoogleSignInAfterEmailVerification() {
-  const params = new URLSearchParams(window.location.search);
-  const actionCode = params.get("oobCode");
-  try {
-    const expectedEmail = localStorage.getItem(googleVerificationStorageKey);
-    if (!actionCode || params.get("mode") !== "verifyEmail" || !expectedEmail) {
-      throw new Error("Request a new sign-in link before continuing.");
-    }
-    const action = await checkActionCode(auth, actionCode);
-    const verifiedEmail = action.data.email?.toLowerCase() || "";
-    if (!verifiedEmail || verifiedEmail !== expectedEmail) {
-      throw new Error("This verification link doesn't match the requested organization email.");
-    }
-    await applyActionCode(auth, actionCode);
-    window.history.replaceState({}, document.title, window.location.pathname);
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: "select_account" });
-    await signInWithRedirect(auth, provider);
-  } catch (error) {
-    setStatus(error.message || "Email verification failed. Request a new verification email.", "error");
-  }
-}
-
-async function finishGoogleRedirectSignIn() {
-  try {
-    const credential = await getRedirectResult(auth);
-    if (!credential) return;
-    const expectedEmail = localStorage.getItem(googleVerificationStorageKey);
-    const actualEmail = credential.user.email?.toLowerCase() || "";
-    if (!expectedEmail || actualEmail !== expectedEmail) {
-      await signOut(auth);
-      localStorage.removeItem(googleVerificationStorageKey);
-      localStorage.removeItem(pendingSignInMethodStorageKey);
-      setStatus("Choose the Google account whose email address you verified.", "error");
-      return;
-    }
-    const googleCredential = GoogleAuthProvider.credentialFromResult(credential);
-    if (!googleCredential?.idToken) {
-      throw new Error("Google did not return an identity token. Try signing in again.");
-    }
-    localStorage.removeItem(googleVerificationStorageKey);
-    localStorage.removeItem(pendingSignInMethodStorageKey);
-    workspaceIdToken = googleCredential.idToken;
-    await connectSignedInUser(credential.user);
-  } catch (error) {
-    setStatus(error.message || "Google sign-in could not be completed.", "error");
-  }
-}
-
 async function completeEmailLinkSignIn(email) {
   try {
     const credential = await signInWithEmailLink(auth, email, window.location.href);
-    const linkIntent = new URLSearchParams(window.location.search).get("continue");
-    const signInMethod = ["email", "google"].includes(linkIntent)
-      ? linkIntent
-      : localStorage.getItem(pendingSignInMethodStorageKey) || "email";
     localStorage.removeItem(emailForSignInStorageKey);
     window.history.replaceState({}, document.title, window.location.pathname);
-    if (signInMethod === "google") {
-      localStorage.setItem(googleVerificationStorageKey, credential.user.email?.toLowerCase() || email);
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: "select_account" });
-      const googleAlreadyLinked = credential.user.providerData.some((item) => item.providerId === "google.com");
-      if (googleAlreadyLinked) {
-        await reauthenticateWithRedirect(credential.user, provider);
-      } else {
-        await linkWithRedirect(credential.user, provider);
-      }
-      return;
-    }
-    localStorage.removeItem(pendingSignInMethodStorageKey);
     await connectSignedInUser(credential.user);
   } catch (error) {
     await signOut(auth).catch(() => {});
@@ -271,7 +180,10 @@ async function connectSignedInUser(user) {
     ? "Sign in with Google"
     : "Refresh Google session";
   await loadOrganizations();
-  setStatus("Signed in with your organization's verified email.");
+  const isGoogle = user.providerData.some((provider) => provider.providerId === "google.com") || Boolean(workspaceIdToken);
+  setStatus(isGoogle
+    ? `Signed in with the ${workspaceDomain} Google Workspace domain.`
+    : "Signed in with your organization's verified email.");
 }
 
 document.querySelector("#sign-out").addEventListener("click", () => signOut(auth));
@@ -359,7 +271,6 @@ document.querySelector("#copy-page-link").addEventListener("click", async () => 
 
 async function handleAuthState(user) {
   if (user && (workspaceIdToken || workspaceDomain)) return;
-  if (user && localStorage.getItem(pendingSignInMethodStorageKey) === "google") return;
   dashboard.hidden = true;
   if (!user) {
     workspaceIdToken = "";
