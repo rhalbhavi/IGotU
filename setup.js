@@ -48,10 +48,8 @@ let verificationPollTimer = null;
 
 function getVerificationActionUrl() {
   const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-  if (isLocal) {
-    return `${window.location.origin}/setup.html`;
-  }
-  return "https://igotu-web.vercel.app/setup.html";
+  const baseUrl = isLocal ? `${window.location.origin}/setup.html` : "https://igotu-web.vercel.app/setup.html";
+  return `${baseUrl}?verified=true`;
 }
 
 function clearWorkspaceToken() {
@@ -95,7 +93,12 @@ function clearPendingVerification() {
 
 async function isUserVerified(user) {
   if (!user) return false;
-  // 1. Check custom claim on ID token
+  // 1. Check local storage verified UID flag
+  if (localStorage.getItem(`igotu_verified_uid_${user.uid}`) === "true") {
+    return true;
+  }
+
+  // 2. Check custom claim on ID token
   try {
     const tokenResult = await user.getIdTokenResult();
     if (tokenResult?.claims?.igotu_verified) {
@@ -106,23 +109,7 @@ async function isUserVerified(user) {
     console.warn("getIdTokenResult check error:", e);
   }
 
-  // 2. Check local storage verified UID flag
-  if (localStorage.getItem(`igotu_verified_uid_${user.uid}`) === "true") {
-    // Confirm with server if online
-    try {
-      const res = await apiRequest("/api/auth/status", "GET");
-      if (res?.verified) {
-        return true;
-      }
-      localStorage.removeItem(`igotu_verified_uid_${user.uid}`);
-      return false;
-    } catch {
-      // If server check fails (network/offline), trust local cache
-      return true;
-    }
-  }
-
-  // 3. Ask server
+  // 3. Ask server status endpoint
   try {
     const res = await apiRequest("/api/auth/status", "GET");
     if (res?.verified) {
@@ -133,12 +120,27 @@ async function isUserVerified(user) {
     console.warn("api/auth/status check error:", e);
   }
 
+  // 4. Check if user verified via Firebase email action while awaiting verification
+  const wasAwaiting = Boolean(
+    sessionStorage.getItem(`igotu_awaiting_verification_${user.uid}`) ||
+    getPendingVerification()?.email ||
+    (verifyAccountPanel && !verifyAccountPanel.hidden)
+  );
+  const urlParams = new URLSearchParams(window.location.search);
+  const isVerifiedParam = urlParams.get("verified") === "true";
+
+  if ((wasAwaiting || isVerifiedParam) && user.emailVerified) {
+    return true;
+  }
+
   return false;
 }
 
 async function markUserVerified(user) {
   if (!user) return;
   localStorage.setItem(`igotu_verified_uid_${user.uid}`, "true");
+  localStorage.setItem("igotu_just_verified", Date.now().toString());
+  sessionStorage.removeItem(`igotu_awaiting_verification_${user.uid}`);
   try {
     await apiRequest("/api/auth/confirm-verification", "POST");
   } catch (e) {
@@ -146,29 +148,58 @@ async function markUserVerified(user) {
   }
 }
 
+let isTransitioningToSuccess = false;
+
+function showVerifiedSuccessScreen() {
+  authPanel.hidden = true;
+  if (verifyAccountPanel) verifyAccountPanel.hidden = true;
+  dashboard.hidden = true;
+  if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = false;
+}
+
+async function triggerVerificationSuccessTransition(user) {
+  if (isTransitioningToSuccess) return;
+  isTransitioningToSuccess = true;
+
+  stopVerificationPolling();
+  clearPendingVerification();
+
+  showVerifiedSuccessScreen();
+
+  if (user) {
+    localStorage.setItem(`igotu_verified_uid_${user.uid}`, "true");
+    localStorage.setItem("igotu_just_verified", Date.now().toString());
+    sessionStorage.removeItem(`igotu_awaiting_verification_${user.uid}`);
+    await markUserVerified(user);
+    try {
+      await connectSignedInUser(user, { deferDashboard: true });
+    } catch (e) {
+      console.warn("connectSignedInUser error in transition:", e);
+    }
+  }
+
+  setTimeout(() => {
+    if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
+    if (auth?.currentUser) {
+      dashboard.hidden = false;
+      if (organizations.length > 0) {
+        showOrganization(selectedOrganization || organizations[0]);
+      }
+    } else {
+      showAuthScreen();
+      setStatus("Email verified successfully! Sign in to access your dashboard.");
+    }
+    isTransitioningToSuccess = false;
+  }, 2000);
+}
+
 async function checkVerificationStatus() {
-  if (!auth?.currentUser) return;
+  if (!auth?.currentUser || isTransitioningToSuccess) return;
   try {
     await auth.currentUser.reload();
     const verified = await isUserVerified(auth.currentUser);
     if (verified) {
-      stopVerificationPolling();
-      clearPendingVerification();
-
-      authPanel.hidden = true;
-      if (verifyAccountPanel) verifyAccountPanel.hidden = true;
-      dashboard.hidden = true;
-      if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = false;
-
-      await connectSignedInUser(auth.currentUser, { deferDashboard: true });
-
-      setTimeout(() => {
-        if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
-        dashboard.hidden = false;
-        if (organizations.length > 0) {
-          showOrganization(selectedOrganization || organizations[0]);
-        }
-      }, 2000);
+      await triggerVerificationSuccessTransition(auth.currentUser);
     }
   } catch (e) {
     console.warn("checkVerificationStatus notice:", e);
@@ -191,6 +222,13 @@ window.addEventListener("focus", checkVerificationStatus);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     checkVerificationStatus();
+  }
+});
+window.addEventListener("storage", (event) => {
+  if (event.key === "igotu_just_verified" || event.key?.startsWith("igotu_verified_uid_")) {
+    if (auth?.currentUser && !isTransitioningToSuccess) {
+      triggerVerificationSuccessTransition(auth.currentUser);
+    }
   }
 });
 
@@ -218,9 +256,13 @@ if (!isFirebaseConfigured) {
   const urlParams = new URLSearchParams(window.location.search);
   const authMode = urlParams.get("mode");
   const actionCode = urlParams.get("oobCode");
+  const isVerifiedRedirect = urlParams.get("verified") === "true";
   const isActionRedirect = (authMode === "verifyEmail" && actionCode) || isSignInWithEmailLink(auth, window.location.href);
 
-  if (pendingOnLoad?.email && !isActionRedirect) {
+  if (isVerifiedRedirect) {
+    showVerifiedSuccessScreen();
+    window.history.replaceState({}, document.title, window.location.pathname);
+  } else if (pendingOnLoad?.email && !isActionRedirect) {
     showVerifyAccountScreen(pendingOnLoad.email);
     startVerificationPolling();
   }
@@ -249,8 +291,7 @@ resendVerificationButton?.addEventListener("click", async () => {
   try {
     if (auth?.currentUser) {
       await sendEmailVerification(auth.currentUser, {
-        url: getVerificationActionUrl(),
-        handleCodeInApp: true
+        url: getVerificationActionUrl()
       });
       localStorage.setItem(`igotu_sent_verification_${auth.currentUser.uid}`, Date.now().toString());
     } else if (email) {
@@ -329,15 +370,10 @@ function showAuthScreen() {
 }
 
 async function handleEmailVerificationRedirect(actionCode) {
-  authPanel.hidden = true;
-  dashboard.hidden = true;
-  if (verifyAccountPanel) verifyAccountPanel.hidden = true;
-  if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
+  showVerifiedSuccessScreen();
 
   try {
     await applyActionCode(auth, actionCode);
-    clearPendingVerification();
-    stopVerificationPolling();
 
     // Ensure Firebase user authentication state is resolved if opened in a fresh tab
     let user = auth.currentUser;
@@ -354,36 +390,8 @@ async function handleEmailVerificationRedirect(actionCode) {
       });
     }
 
-    if (user) {
-      await user.reload();
-      await markUserVerified(user);
-      await connectSignedInUser(user, { deferDashboard: true });
-    }
-
     window.history.replaceState({}, document.title, window.location.pathname);
-
-    // Show verified status screen:
-    // Heading: 'Email verified successfully!'
-    // Animated green tick mark icon in green box below it
-    // Body text: 'You will be redirected to your dashboard shortly.'
-    authPanel.hidden = true;
-    if (verifyAccountPanel) verifyAccountPanel.hidden = true;
-    dashboard.hidden = true;
-    if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = false;
-
-    // After 2 seconds navigate to dashboard screen where organization details editing is
-    setTimeout(() => {
-      if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
-      if (auth.currentUser) {
-        dashboard.hidden = false;
-        if (organizations.length > 0) {
-          showOrganization(selectedOrganization || organizations[0]);
-        }
-      } else {
-        showAuthScreen();
-        setStatus("Email verified successfully! Sign in to access your dashboard.");
-      }
-    }, 2000);
+    await triggerVerificationSuccessTransition(user);
   } catch (error) {
     showAuthScreen();
     setStatus(error.message || "Email verification failed or link has expired.", "error");
@@ -496,8 +504,7 @@ async function signInToWorkspace() {
       setStatus("Sending verification email…");
       try {
         await sendEmailVerification(credential.user, {
-          url: getVerificationActionUrl(),
-          handleCodeInApp: true
+          url: getVerificationActionUrl()
         });
         localStorage.setItem(sentKey, Date.now().toString());
       } catch (emailErr) {
@@ -509,6 +516,7 @@ async function signInToWorkspace() {
     }
 
     setPendingVerification(email, "google", credential.user.uid);
+    sessionStorage.setItem(`igotu_awaiting_verification_${credential.user.uid}`, "true");
     showVerifyAccountScreen(email);
     startVerificationPolling();
   } catch (error) {
@@ -575,24 +583,9 @@ async function completeEmailLinkSignIn(email) {
     const credential = await signInWithEmailLink(auth, email, window.location.href);
     signedInUser = credential.user;
     localStorage.removeItem(emailForSignInStorageKey);
-    await markUserVerified(credential.user);
-    clearPendingVerification();
-    stopVerificationPolling();
     window.history.replaceState({}, document.title, window.location.pathname);
-    await connectSignedInUser(credential.user, { deferDashboard: true });
+    await triggerVerificationSuccessTransition(credential.user);
     signedInUser = null;
-
-    // Show verification success screen with large green check mark in light green circle
-    authPanel.hidden = true;
-    if (verifyAccountPanel) verifyAccountPanel.hidden = true;
-    dashboard.hidden = true;
-    if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = false;
-
-    // After 2 seconds navigate to dashboard screen
-    setTimeout(() => {
-      if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
-      dashboard.hidden = false;
-    }, 2000);
   } catch (error) {
     await signOut(auth).catch(() => {});
     showAuthScreen();
@@ -724,6 +717,8 @@ document.querySelector("#copy-page-link").addEventListener("click", async () => 
 
 async function handleAuthState(user) {
   const pending = getPendingVerification();
+  const urlParams = new URLSearchParams(window.location.search);
+  const isVerifiedRedirect = urlParams.get("verified") === "true";
 
   if (user) {
     const email = user.email?.toLowerCase() || "";
@@ -753,9 +748,24 @@ async function handleAuthState(user) {
       console.warn("Could not reload user in auth state change:", e);
     }
 
+    if (isVerifiedRedirect) {
+      await triggerVerificationSuccessTransition(user);
+      return;
+    }
+
     const verified = await isUserVerified(user);
 
     if (verified) {
+      const wasPending = Boolean(
+        pending?.email ||
+        sessionStorage.getItem(`igotu_awaiting_verification_${user.uid}`) ||
+        (verifyAccountPanel && !verifyAccountPanel.hidden)
+      );
+      if (wasPending && !isTransitioningToSuccess) {
+        await triggerVerificationSuccessTransition(user);
+        return;
+      }
+
       stopVerificationPolling();
       clearPendingVerification();
       if (verifyAccountPanel) verifyAccountPanel.hidden = true;
@@ -772,14 +782,26 @@ async function handleAuthState(user) {
       const displayEmail = email || pending?.email || user.email || "";
       dashboard.hidden = true;
       authPanel.hidden = true;
+      if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
       if (displayEmail) {
         setPendingVerification(displayEmail, user.providerData?.[0]?.providerId === "google.com" ? "google" : "email", user.uid);
+        sessionStorage.setItem(`igotu_awaiting_verification_${user.uid}`, "true");
         showVerifyAccountScreen(displayEmail);
         startVerificationPolling();
         return;
       }
     }
   } else {
+    if (isVerifiedRedirect) {
+      showVerifiedSuccessScreen();
+      setTimeout(() => {
+        if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
+        showAuthScreen();
+        setStatus("Email verified successfully! Sign in to access your dashboard.");
+      }, 2500);
+      return;
+    }
+
     if (pending?.email) {
       showVerifyAccountScreen(pending.email);
       startVerificationPolling();
@@ -792,15 +814,10 @@ async function handleAuthState(user) {
     if (verifyAccountPanel) verifyAccountPanel.hidden = true;
     if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
     organizationForm.hidden = true;
+    dashboard.hidden = true;
     setStatus("");
     return;
   }
-
-  authPanel.hidden = false;
-  if (verifyAccountPanel) verifyAccountPanel.hidden = true;
-  if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
-  organizationForm.hidden = true;
-  setStatus("Sign in again with Google or verify your organization email for this session.", "error");
 }
 
 async function loadOrganizations(selectedSlug = "") {
