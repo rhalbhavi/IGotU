@@ -906,6 +906,7 @@ function showOrganization(organization) {
   document.querySelector("#edit-org-name").value = organization.name;
   document.querySelector("#edit-org-type").value = organization.type;
   document.querySelector("#edit-org-slug").textContent = organization.slug;
+  updateCounselorLegend(organization.type);
   const publishOption = document.querySelector("#publish-organization");
   publishOption.checked = organization.published;
   document.querySelector("#organization-address").value = organization.address || "";
@@ -1112,6 +1113,19 @@ async function apiRequest(url, method = "GET", body) {
   if (!response.ok) throw new Error(result.error || `The request failed (HTTP ${response.status}).`);
   return result;
 }
+
+function updateCounselorLegend(orgType) {
+  const legend = document.querySelector("#counselor-legend");
+  if (!legend) return;
+  legend.textContent = orgType === "residential"
+    ? "Counsellor support"
+    : "Counsellor or student support";
+}
+
+// Update counselor legend when org type dropdown changes
+document.querySelector("#edit-org-type")?.addEventListener("change", (e) => {
+  updateCounselorLegend(e.target.value);
+});
 
 function publicPageUrl(slug) {
   return `${window.location.origin}/support/${encodeURIComponent(slug)}`;
