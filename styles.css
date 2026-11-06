@@ -387,7 +387,7 @@ footer strong { color: var(--brand); }
 .slug-input-row span { flex: 0 0 auto; color: var(--muted); font-size: calc(.78rem + 2px); }
 .slug-input-row input { min-width: 0; }
 .phone-input-row { display: flex; gap: 8px; align-items: stretch; }
-.phone-country-select { flex: 0 0 auto; width: 110px; min-height: 46px; padding: 10px 6px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--surface); font-size: 15px; }
+.phone-country-select { flex: 0 0 auto; width: 72px; min-height: 46px; padding: 10px 4px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--surface); font-size: 15px; }
 .phone-input-row input { min-width: 0; flex: 1 1 auto; }
 .slug-display { overflow-wrap: anywhere; }
 .slug-display code, .page-link-preview { color: var(--brand); overflow-wrap: anywhere; }
@@ -425,7 +425,7 @@ footer strong { color: var(--brand); }
   .admin-account { align-items: flex-start; flex-direction: column; }
   .slug-input-row { align-items: stretch; flex-direction: column; }
   .email-sign-in-row { align-items: stretch; flex-direction: column; }
-  .phone-country-select { width: 95px; }
+  .phone-country-select { width: 68px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
