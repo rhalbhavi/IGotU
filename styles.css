@@ -365,12 +365,12 @@ footer strong { color: var(--brand); }
 .place-search[hidden], .place-search-results[hidden] { display: none; }
 .google-sign-in-button { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; gap: 10px; }
 .admin-panel h2 { margin-bottom: 7px; font-size: calc(1.25rem + 2px); }
-.admin-panel > p { color: var(--muted); font-size: calc(.86rem + 2px); }
+.admin-panel > p, .admin-form p { color: var(--muted); font-size: 1rem; line-height: 1.5; }
 .admin-form { display: grid; gap: 8px; }
-.admin-form label, .admin-panel > label { margin-top: 7px; font-size: calc(.82rem + 2px); font-weight: 800; }
+.admin-form label, .admin-panel > label { margin-top: 7px; font-size: calc(.82rem + 4px); font-weight: 800; }
 .admin-form input, .admin-form select, .admin-panel select { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--surface); }
 .admin-form fieldset { display: grid; gap: 7px; padding: 16px; margin-top: 12px; border: 1px solid var(--line); border-radius: 14px; }
-.admin-form legend { padding: 0 6px; color: var(--brand); font-weight: 800; }
+.admin-form legend { padding: 0 6px; color: var(--brand); font-size: calc(.82rem + 4px); font-weight: 800; }
 .admin-form fieldset label { margin-top: 2px; }
 .admin-form small { color: var(--muted); }
 .admin-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 10px; }
