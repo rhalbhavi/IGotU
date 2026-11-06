@@ -95,3 +95,15 @@ test("public organization output excludes admin and audit data", () => {
   });
   assert.deepEqual(Object.keys(result).sort(), ["contacts", "name", "published", "slug", "type"]);
 });
+
+test("requires bearer token for verified user access", async () => {
+  const { requireVerifiedUser } = await import("../lib/server.js");
+  await assert.rejects(
+    () => requireVerifiedUser({ headers: {} }),
+    (error) => error instanceof HttpError && error.status === 401
+  );
+  await assert.rejects(
+    () => requireVerifiedUser({ headers: { authorization: "Basic 123" } }),
+    (error) => error instanceof HttpError && error.status === 401
+  );
+});

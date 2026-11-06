@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
 import {
   GoogleAuthProvider,
+  deleteUser,
   getAuth,
   isSignInWithEmailLink,
   onAuthStateChanged,
@@ -70,6 +71,27 @@ emailSignInButton.addEventListener("click", () => {
 });
 emailSignInForm.addEventListener("submit", handleEmailSignIn);
 
+function parseJwtPayload(token) {
+  try {
+    if (typeof token !== "string") return null;
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    let base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    while (base64.length % 4) {
+      base64 += "=";
+    }
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
 async function signInToWorkspace() {
   if (!auth) return;
   if (window.location.hostname === "127.0.0.1") {
@@ -84,21 +106,46 @@ async function signInToWorkspace() {
     await signOut(auth).catch(() => {});
   }
   setStatus("Opening Google sign-in…");
+  let signedInUser = null;
   try {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
     const credential = await signInWithPopup(auth, provider);
-    const googleEmailDomain = credential.user.email?.toLowerCase().split("@").pop();
-    if (googleEmailDomain === "gmail.com" || googleEmailDomain === "googlemail.com") {
+    signedInUser = credential.user;
+
+    const email = credential.user.email?.toLowerCase() || "";
+    const googleEmailDomain = email.split("@").pop();
+    if (!email || googleEmailDomain === "gmail.com" || googleEmailDomain === "googlemail.com") {
       throw new Error("Use your organization's Google Workspace account. Personal Gmail accounts aren't accepted.");
     }
+
     const googleCredential = GoogleAuthProvider.credentialFromResult(credential);
     if (!googleCredential?.idToken) {
       throw new Error("Google did not return an identity token. Check the Firebase Google provider setup.");
     }
+
+    const tokenPayload = parseJwtPayload(googleCredential.idToken);
+    const hostedDomain = tokenPayload?.hd?.toLowerCase();
+    if (
+      !hostedDomain ||
+      hostedDomain === "gmail.com" ||
+      hostedDomain === "googlemail.com" ||
+      googleEmailDomain !== hostedDomain
+    ) {
+      throw new Error("Use your organization's Google Workspace account. Personal Gmail accounts aren't accepted.");
+    }
+
     workspaceIdToken = googleCredential.idToken;
     await connectSignedInUser(credential.user);
+    signedInUser = null;
   } catch (error) {
+    if (signedInUser) {
+      try {
+        await deleteUser(signedInUser);
+      } catch (deleteError) {
+        console.warn("Could not delete unauthorized Firebase user:", deleteError);
+      }
+    }
     const popupWasClosed = ["auth/popup-closed-by-user", "auth/cancelled-popup-request"].includes(error.code);
     if (popupWasClosed || !alreadyVerified) {
       workspaceIdToken = "";
@@ -147,12 +194,22 @@ async function handleEmailSignIn(event) {
 }
 
 async function completeEmailLinkSignIn(email) {
+  let signedInUser = null;
   try {
     const credential = await signInWithEmailLink(auth, email, window.location.href);
+    signedInUser = credential.user;
     localStorage.removeItem(emailForSignInStorageKey);
     window.history.replaceState({}, document.title, window.location.pathname);
     await connectSignedInUser(credential.user);
+    signedInUser = null;
   } catch (error) {
+    if (signedInUser) {
+      try {
+        await deleteUser(signedInUser);
+      } catch (deleteError) {
+        console.warn("Could not delete unverified email user:", deleteError);
+      }
+    }
     await signOut(auth).catch(() => {});
     setStatus(error.message || "That sign-in link is invalid or expired. Request a new one.", "error");
   }
@@ -280,6 +337,24 @@ async function handleAuthState(user) {
     setStatus("");
     return;
   }
+
+  const email = user.email?.toLowerCase() || "";
+  const domain = email.split("@").pop();
+  if (!email || domain === "gmail.com" || domain === "googlemail.com") {
+    try {
+      await deleteUser(user);
+    } catch (e) {
+      console.warn("Could not delete invalid user on auth state change:", e);
+    }
+    workspaceIdToken = "";
+    workspaceDomain = "";
+    await signOut(auth).catch(() => {});
+    authPanel.hidden = false;
+    organizationForm.hidden = true;
+    setStatus("Use your organization's Google Workspace account. Personal Gmail accounts aren't accepted.", "error");
+    return;
+  }
+
   authPanel.hidden = false;
   organizationForm.hidden = true;
   setStatus("Sign in again with Google or verify your organization email for this session.", "error");
