@@ -194,7 +194,10 @@ async function triggerVerificationSuccessTransition(user) {
 }
 
 async function checkVerificationStatus() {
-  if (!auth?.currentUser || isTransitioningToSuccess) return;
+  // Don't run if already on the dashboard (user is logged in) or mid-transition
+  if (!auth?.currentUser || isTransitioningToSuccess || !dashboard.hidden) return;
+  // Only run while the verify-account panel is visible (actively awaiting verification)
+  if (verifyAccountPanel && verifyAccountPanel.hidden) return;
   try {
     await auth.currentUser.reload();
     const verified = await isUserVerified(auth.currentUser);
@@ -226,6 +229,8 @@ document.addEventListener("visibilitychange", () => {
 });
 window.addEventListener("storage", (event) => {
   if (event.key === "igotu_just_verified" || event.key?.startsWith("igotu_verified_uid_")) {
+    // Only trigger success transition if the user is actively on the verify screen
+    if (auth?.currentUser && !isTransitioningToSuccess && !dashboard.hidden) return;
     if (auth?.currentUser && !isTransitioningToSuccess) {
       triggerVerificationSuccessTransition(auth.currentUser);
     }
