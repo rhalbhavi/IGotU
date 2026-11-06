@@ -69,13 +69,14 @@ function getPendingVerification() {
   }
 }
 
-function setPendingVerification(email, provider = "google") {
+function setPendingVerification(email, provider = "google", uid = "") {
   try {
     localStorage.setItem(
       pendingVerificationStorageKey,
       JSON.stringify({
         email: (email || "").toLowerCase().trim(),
         provider,
+        uid: uid || "",
         sentAt: Date.now()
       })
     );
@@ -92,11 +93,65 @@ function clearPendingVerification() {
   }
 }
 
+async function isUserVerified(user) {
+  if (!user) return false;
+  // 1. Check custom claim on ID token
+  try {
+    const tokenResult = await user.getIdTokenResult();
+    if (tokenResult?.claims?.igotu_verified) {
+      localStorage.setItem(`igotu_verified_uid_${user.uid}`, "true");
+      return true;
+    }
+  } catch (e) {
+    console.warn("getIdTokenResult check error:", e);
+  }
+
+  // 2. Check local storage verified UID flag
+  if (localStorage.getItem(`igotu_verified_uid_${user.uid}`) === "true") {
+    // Confirm with server if online
+    try {
+      const res = await apiRequest("/api/auth/status", "GET");
+      if (res?.verified) {
+        return true;
+      }
+      localStorage.removeItem(`igotu_verified_uid_${user.uid}`);
+      return false;
+    } catch {
+      // If server check fails (network/offline), trust local cache
+      return true;
+    }
+  }
+
+  // 3. Ask server
+  try {
+    const res = await apiRequest("/api/auth/status", "GET");
+    if (res?.verified) {
+      localStorage.setItem(`igotu_verified_uid_${user.uid}`, "true");
+      return true;
+    }
+  } catch (e) {
+    console.warn("api/auth/status check error:", e);
+  }
+
+  return false;
+}
+
+async function markUserVerified(user) {
+  if (!user) return;
+  localStorage.setItem(`igotu_verified_uid_${user.uid}`, "true");
+  try {
+    await apiRequest("/api/auth/confirm-verification", "POST");
+  } catch (e) {
+    console.warn("confirm-verification notice:", e);
+  }
+}
+
 async function checkVerificationStatus() {
   if (!auth?.currentUser) return;
   try {
     await auth.currentUser.reload();
-    if (auth.currentUser.emailVerified) {
+    const verified = await isUserVerified(auth.currentUser);
+    if (verified) {
       stopVerificationPolling();
       clearPendingVerification();
 
@@ -197,6 +252,7 @@ resendVerificationButton?.addEventListener("click", async () => {
         url: getVerificationActionUrl(),
         handleCodeInApp: true
       });
+      localStorage.setItem(`igotu_sent_verification_${auth.currentUser.uid}`, Date.now().toString());
     } else if (email) {
       await sendSignInLinkToEmail(auth, email, {
         url: getVerificationActionUrl(),
@@ -206,7 +262,7 @@ resendVerificationButton?.addEventListener("click", async () => {
       showAuthScreen();
       return;
     }
-    if (email) setPendingVerification(email);
+    if (email) setPendingVerification(email, "google", auth?.currentUser?.uid);
     setVerifyStatus("Verification email resent! Please check your inbox and spam folder.");
   } catch (error) {
     setVerifyStatus(error.message || "Failed to resend verification email.", "error");
@@ -300,6 +356,7 @@ async function handleEmailVerificationRedirect(actionCode) {
 
     if (user) {
       await user.reload();
+      await markUserVerified(user);
       await connectSignedInUser(user, { deferDashboard: true });
     }
 
@@ -420,9 +477,10 @@ async function signInToWorkspace() {
     localStorage.setItem("igotu-workspace-id-token", workspaceIdToken);
     localStorage.setItem(emailForSignInStorageKey, email);
 
-    // Check if the user is already verified
+    // Check if the user is already verified in IGotU
     await credential.user.reload().catch(() => {});
-    if (credential.user.emailVerified) {
+    const verified = await isUserVerified(credential.user);
+    if (verified) {
       clearPendingVerification();
       stopVerificationPolling();
       await connectSignedInUser(credential.user);
@@ -430,15 +488,9 @@ async function signInToWorkspace() {
     }
 
     // User is NOT verified yet - cannot access dashboard.
-    // Check tracking logic: Have we already sent a verification email to this address?
-    // Checks localStorage or Firebase cloud creationTime to detect existing accounts even if browser history was cleared.
-    const pending = getPendingVerification();
-    const isExistingUser = Boolean(
-      credential.user.metadata?.creationTime &&
-      credential.user.metadata?.lastSignInTime &&
-      credential.user.metadata.creationTime !== credential.user.metadata.lastSignInTime
-    );
-    const alreadySent = Boolean((pending && pending.email === email) || isExistingUser);
+    // Check tracking logic: Have we already sent a verification email to this specific account UID?
+    const sentKey = `igotu_sent_verification_${credential.user.uid}`;
+    const alreadySent = Boolean(localStorage.getItem(sentKey));
 
     if (!alreadySent) {
       setStatus("Sending verification email…");
@@ -447,6 +499,7 @@ async function signInToWorkspace() {
           url: getVerificationActionUrl(),
           handleCodeInApp: true
         });
+        localStorage.setItem(sentKey, Date.now().toString());
       } catch (emailErr) {
         console.warn("sendEmailVerification notice:", emailErr);
       }
@@ -455,7 +508,7 @@ async function signInToWorkspace() {
       setStatus("");
     }
 
-    setPendingVerification(email, "google");
+    setPendingVerification(email, "google", credential.user.uid);
     showVerifyAccountScreen(email);
     startVerificationPolling();
   } catch (error) {
@@ -522,6 +575,7 @@ async function completeEmailLinkSignIn(email) {
     const credential = await signInWithEmailLink(auth, email, window.location.href);
     signedInUser = credential.user;
     localStorage.removeItem(emailForSignInStorageKey);
+    await markUserVerified(credential.user);
     clearPendingVerification();
     stopVerificationPolling();
     window.history.replaceState({}, document.title, window.location.pathname);
@@ -540,13 +594,6 @@ async function completeEmailLinkSignIn(email) {
       dashboard.hidden = false;
     }, 2000);
   } catch (error) {
-    if (signedInUser) {
-      try {
-        await deleteUser(signedInUser);
-      } catch (deleteError) {
-        console.warn("Could not delete unverified email user:", deleteError);
-      }
-    }
     await signOut(auth).catch(() => {});
     showAuthScreen();
     setStatus(error.message || "That sign-in link is invalid or expired. Request a new one.", "error");
@@ -706,7 +753,9 @@ async function handleAuthState(user) {
       console.warn("Could not reload user in auth state change:", e);
     }
 
-    if (user.emailVerified) {
+    const verified = await isUserVerified(user);
+
+    if (verified) {
       stopVerificationPolling();
       clearPendingVerification();
       if (verifyAccountPanel) verifyAccountPanel.hidden = true;
@@ -720,9 +769,11 @@ async function handleAuthState(user) {
         console.warn("connectSignedInUser error in auth state:", e);
       }
     } else {
-      const displayEmail = email || pending?.email || "";
+      const displayEmail = email || pending?.email || user.email || "";
+      dashboard.hidden = true;
+      authPanel.hidden = true;
       if (displayEmail) {
-        setPendingVerification(displayEmail, user.providerData?.[0]?.providerId === "google.com" ? "google" : "email");
+        setPendingVerification(displayEmail, user.providerData?.[0]?.providerId === "google.com" ? "google" : "email", user.uid);
         showVerifyAccountScreen(displayEmail);
         startVerificationPolling();
         return;

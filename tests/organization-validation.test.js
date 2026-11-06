@@ -137,3 +137,14 @@ test("requires bearer token for verified user access", async () => {
     (error) => error instanceof HttpError && error.status === 401
   );
 });
+
+test("checkUserVerifiedInIgotu validates verified status from claims or fallback", async () => {
+  const { checkUserVerifiedInIgotu } = await import("../lib/server.js");
+  // Verified via custom claim
+  const verifiedClaim = await checkUserVerifiedInIgotu("user-1", { igotu_verified: true });
+  assert.equal(verifiedClaim, true);
+
+  // Unverified user with no claims
+  const unverified = await checkUserVerifiedInIgotu("user-2", { igotu_verified: false });
+  assert.equal(unverified, false);
+});
