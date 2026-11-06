@@ -87,11 +87,11 @@
 
     <!-- Email Verified Success Panel -->
     <section id="verified-success-panel" class="admin-panel verify-panel success-panel" hidden aria-labelledby="verified-success-title">
-      <div class="success-circle">
+      <h2 id="verified-success-title" class="success-heading">Email verified successfully!</h2>
+      <div class="success-box">
         <span class="material-symbols-rounded success-icon" aria-hidden="true">check</span>
       </div>
-      <h2 id="verified-success-title" class="success-heading">Email verified successfully!</h2>
-      <p class="success-subtext">Navigating to your dashboard…</p>
+      <p class="success-subtext">You will be redirected to your dashboard shortly.</p>
     </section>
 
     <section id="dashboard" hidden>
@@ -175,7 +175,18 @@
           <label for="security-label">Display name</label>
           <input id="security-label" type="text" maxlength="60" placeholder="Community Security">
           <label for="security-phone">Phone number</label>
-          <input id="security-phone" type="tel" inputmode="tel" maxlength="24" placeholder="+91 98765 43210">
+          <div class="phone-input-row">
+            <select id="security-country" class="phone-country-select" aria-label="Security contact country code">
+              <option value="+91" selected>India (+91)</option>
+              <option value="+1">USA (+1)</option>
+              <option value="+1-CA">Canada (+1)</option>
+              <option value="+44">UK (+44)</option>
+              <option value="+61">Australia (+61)</option>
+              <option value="+49">Germany (+49)</option>
+              <option value="other">Other</option>
+            </select>
+            <input id="security-phone" type="tel" inputmode="tel" maxlength="24" placeholder="98765 43210">
+          </div>
           <label for="security-description">Short details (optional)</label>
           <input id="security-description" type="text" maxlength="150" placeholder="Available at the front desk">
         </fieldset>
@@ -185,7 +196,18 @@
           <label for="medical-label">Display name</label>
           <input id="medical-label" type="text" maxlength="60" placeholder="On-site Medical Services">
           <label for="medical-phone">Phone number</label>
-          <input id="medical-phone" type="tel" inputmode="tel" maxlength="24" placeholder="+91 98765 43210">
+          <div class="phone-input-row">
+            <select id="medical-country" class="phone-country-select" aria-label="Medical services country code">
+              <option value="+91" selected>India (+91)</option>
+              <option value="+1">USA (+1)</option>
+              <option value="+1-CA">Canada (+1)</option>
+              <option value="+44">UK (+44)</option>
+              <option value="+61">Australia (+61)</option>
+              <option value="+49">Germany (+49)</option>
+              <option value="other">Other</option>
+            </select>
+            <input id="medical-phone" type="tel" inputmode="tel" maxlength="24" placeholder="98765 43210">
+          </div>
           <label for="medical-description">Short details (optional)</label>
           <input id="medical-description" type="text" maxlength="150" placeholder="Clinic hours or location">
         </fieldset>
@@ -195,7 +217,18 @@
           <label for="counselor-label">Display name</label>
           <input id="counselor-label" type="text" maxlength="60" placeholder="Campus Counsellor">
           <label for="counselor-phone">Phone number</label>
-          <input id="counselor-phone" type="tel" inputmode="tel" maxlength="24" placeholder="+91 98765 43210">
+          <div class="phone-input-row">
+            <select id="counselor-country" class="phone-country-select" aria-label="Counsellor country code">
+              <option value="+91" selected>India (+91)</option>
+              <option value="+1">USA (+1)</option>
+              <option value="+1-CA">Canada (+1)</option>
+              <option value="+44">UK (+44)</option>
+              <option value="+61">Australia (+61)</option>
+              <option value="+49">Germany (+49)</option>
+              <option value="other">Other</option>
+            </select>
+            <input id="counselor-phone" type="tel" inputmode="tel" maxlength="24" placeholder="98765 43210">
+          </div>
           <label for="counselor-description">Short details (optional)</label>
           <input id="counselor-description" type="text" maxlength="150" placeholder="Availability or appointment details">
         </fieldset>

@@ -4,6 +4,7 @@ import {
   HttpError,
   publicOrganization,
   readOrganizationInput,
+  readPhone,
   validateSlug
 } from "../lib/server.js";
 
@@ -74,6 +75,35 @@ test("rejects invalid organization types and phone values", () => {
       }),
     (error) => error instanceof HttpError && error.status === 400
   );
+});
+
+test("validates country-specific phone number length and format", () => {
+  // India (+91): exactly 10 digits
+  assert.equal(readPhone("+91 9876543210", "Phone"), "+91 9876543210");
+  assert.throws(() => readPhone("+91 987654321", "Phone"), /10 digits/);
+  assert.throws(() => readPhone("+91 98765432100", "Phone"), /10 digits/);
+
+  // USA & Canada (+1): exactly 10 digits
+  assert.equal(readPhone("+1 2025550123", "Phone"), "+1 2025550123");
+  assert.throws(() => readPhone("+1 202555012", "Phone"), /10 digits/);
+  assert.throws(() => readPhone("+1 20255501234", "Phone"), /10 digits/);
+
+  // UK (+44): 10 or 11 digits
+  assert.equal(readPhone("+44 7911123456", "Phone"), "+44 7911123456");
+  assert.equal(readPhone("+44 79111234567", "Phone"), "+44 79111234567");
+  assert.throws(() => readPhone("+44 791112345", "Phone"), /10 or 11 digits/);
+  assert.throws(() => readPhone("+44 791112345678", "Phone"), /10 or 11 digits/);
+
+  // Australia (+61): exactly 9 digits
+  assert.equal(readPhone("+61 412345678", "Phone"), "+61 412345678");
+  assert.throws(() => readPhone("+61 41234567", "Phone"), /9 digits/);
+  assert.throws(() => readPhone("+61 4123456789", "Phone"), /9 digits/);
+
+  // Germany (+49): 10 or 11 digits
+  assert.equal(readPhone("+49 1512345678", "Phone"), "+49 1512345678");
+  assert.equal(readPhone("+49 15123456789", "Phone"), "+49 15123456789");
+  assert.throws(() => readPhone("+49 151234567", "Phone"), /10 or 11 digits/);
+  assert.throws(() => readPhone("+49 151234567890", "Phone"), /10 or 11 digits/);
 });
 
 test("accepts only lowercase hyphenated slugs", () => {

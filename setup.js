@@ -37,12 +37,108 @@ let auth;
 let organizations = [];
 let selectedOrganization;
 let slugManuallyEdited = false;
-let workspaceIdToken = sessionStorage.getItem("igotu-workspace-id-token") || "";
+let workspaceIdToken = sessionStorage.getItem("igotu-workspace-id-token") || localStorage.getItem("igotu-workspace-id-token") || "";
 let workspaceDomain = "";
 const placeSearches = new Set();
 let nominatimQueue = Promise.resolve();
 let lastNominatimRequestAt = 0;
 const emailForSignInStorageKey = "igotu-email-for-sign-in";
+const pendingVerificationStorageKey = "igotu-pending-verification";
+let verificationPollTimer = null;
+
+function getVerificationActionUrl() {
+  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  if (isLocal) {
+    return `${window.location.origin}/setup.html`;
+  }
+  return "https://igotu-web.vercel.app/setup.html";
+}
+
+function clearWorkspaceToken() {
+  workspaceIdToken = "";
+  sessionStorage.removeItem("igotu-workspace-id-token");
+  localStorage.removeItem("igotu-workspace-id-token");
+}
+
+function getPendingVerification() {
+  try {
+    const raw = localStorage.getItem(pendingVerificationStorageKey);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setPendingVerification(email, provider = "google") {
+  try {
+    localStorage.setItem(
+      pendingVerificationStorageKey,
+      JSON.stringify({
+        email: (email || "").toLowerCase().trim(),
+        provider,
+        sentAt: Date.now()
+      })
+    );
+  } catch (e) {
+    console.warn("Could not save pending verification:", e);
+  }
+}
+
+function clearPendingVerification() {
+  try {
+    localStorage.removeItem(pendingVerificationStorageKey);
+  } catch (e) {
+    console.warn("Could not clear pending verification:", e);
+  }
+}
+
+async function checkVerificationStatus() {
+  if (!auth?.currentUser) return;
+  try {
+    await auth.currentUser.reload();
+    if (auth.currentUser.emailVerified) {
+      stopVerificationPolling();
+      clearPendingVerification();
+
+      authPanel.hidden = true;
+      if (verifyAccountPanel) verifyAccountPanel.hidden = true;
+      dashboard.hidden = true;
+      if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = false;
+
+      await connectSignedInUser(auth.currentUser, { deferDashboard: true });
+
+      setTimeout(() => {
+        if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
+        dashboard.hidden = false;
+        if (organizations.length > 0) {
+          showOrganization(selectedOrganization || organizations[0]);
+        }
+      }, 2000);
+    }
+  } catch (e) {
+    console.warn("checkVerificationStatus notice:", e);
+  }
+}
+
+function startVerificationPolling() {
+  stopVerificationPolling();
+  verificationPollTimer = setInterval(checkVerificationStatus, 3000);
+}
+
+function stopVerificationPolling() {
+  if (verificationPollTimer) {
+    clearInterval(verificationPollTimer);
+    verificationPollTimer = null;
+  }
+}
+
+window.addEventListener("focus", checkVerificationStatus);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    checkVerificationStatus();
+  }
+});
+
 const osmPlaceProvider = window.GeoSearch
   ? new window.GeoSearch.OpenStreetMapProvider({
       params: { limit: 8, "accept-language": document.documentElement.lang || "en" }
@@ -62,11 +158,19 @@ if (!isFirebaseConfigured) {
   authPanel.hidden = true;
 } else {
   auth = getAuth(initializeApp(firebaseConfig));
-  onAuthStateChanged(auth, handleAuthState);
 
+  const pendingOnLoad = getPendingVerification();
   const urlParams = new URLSearchParams(window.location.search);
   const authMode = urlParams.get("mode");
   const actionCode = urlParams.get("oobCode");
+  const isActionRedirect = (authMode === "verifyEmail" && actionCode) || isSignInWithEmailLink(auth, window.location.href);
+
+  if (pendingOnLoad?.email && !isActionRedirect) {
+    showVerifyAccountScreen(pendingOnLoad.email);
+    startVerificationPolling();
+  }
+
+  onAuthStateChanged(auth, handleAuthState);
 
   if (authMode === "verifyEmail" && actionCode) {
     handleEmailVerificationRedirect(actionCode);
@@ -84,30 +188,39 @@ emailSignInButton.addEventListener("click", () => {
 emailSignInForm.addEventListener("submit", handleEmailSignIn);
 
 resendVerificationButton?.addEventListener("click", async () => {
-  const email = localStorage.getItem(emailForSignInStorageKey) || emailSignInAddress.value.trim().toLowerCase();
+  const pending = getPendingVerification();
+  const email = pending?.email || localStorage.getItem(emailForSignInStorageKey) || auth?.currentUser?.email || emailSignInAddress.value.trim().toLowerCase();
   setVerifyStatus("Resending verification email…");
   try {
-    if (auth.currentUser) {
+    if (auth?.currentUser) {
       await sendEmailVerification(auth.currentUser, {
-        url: `${window.location.origin}${window.location.pathname}`,
+        url: getVerificationActionUrl(),
         handleCodeInApp: true
       });
     } else if (email) {
       await sendSignInLinkToEmail(auth, email, {
-        url: `${window.location.origin}${window.location.pathname}`,
+        url: getVerificationActionUrl(),
         handleCodeInApp: true
       });
     } else {
       showAuthScreen();
       return;
     }
+    if (email) setPendingVerification(email);
     setVerifyStatus("Verification email resent! Please check your inbox and spam folder.");
   } catch (error) {
     setVerifyStatus(error.message || "Failed to resend verification email.", "error");
   }
 });
 
-changeEmailButton?.addEventListener("click", () => {
+changeEmailButton?.addEventListener("click", async () => {
+  stopVerificationPolling();
+  clearPendingVerification();
+  clearWorkspaceToken();
+  workspaceDomain = "";
+  if (auth) {
+    await signOut(auth).catch(() => {});
+  }
   showAuthScreen();
 });
 
@@ -162,28 +275,53 @@ function showAuthScreen() {
 async function handleEmailVerificationRedirect(actionCode) {
   authPanel.hidden = true;
   dashboard.hidden = true;
-  showVerifyAccountScreen("");
-  setVerifyStatus("Verifying your email address…");
+  if (verifyAccountPanel) verifyAccountPanel.hidden = true;
+  if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
 
   try {
     await applyActionCode(auth, actionCode);
-    if (auth.currentUser) {
-      await auth.currentUser.reload();
-      await connectSignedInUser(auth.currentUser, { deferDashboard: true });
+    clearPendingVerification();
+    stopVerificationPolling();
+
+    // Ensure Firebase user authentication state is resolved if opened in a fresh tab
+    let user = auth.currentUser;
+    if (!user) {
+      user = await new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(null), 2500);
+        const unsubscribe = onAuthStateChanged(auth, (u) => {
+          if (u) {
+            clearTimeout(timer);
+            unsubscribe();
+            resolve(u);
+          }
+        });
+      });
     }
+
+    if (user) {
+      await user.reload();
+      await connectSignedInUser(user, { deferDashboard: true });
+    }
+
     window.history.replaceState({}, document.title, window.location.pathname);
 
-    // Show large green check mark icon in middle inside light green circle and below Email verified successfully!
+    // Show verified status screen:
+    // Heading: 'Email verified successfully!'
+    // Animated green tick mark icon in green box below it
+    // Body text: 'You will be redirected to your dashboard shortly.'
     authPanel.hidden = true;
     if (verifyAccountPanel) verifyAccountPanel.hidden = true;
     dashboard.hidden = true;
     if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = false;
 
-    // After 2 seconds navigate to dashboard screen
+    // After 2 seconds navigate to dashboard screen where organization details editing is
     setTimeout(() => {
       if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
       if (auth.currentUser) {
         dashboard.hidden = false;
+        if (organizations.length > 0) {
+          showOrganization(selectedOrganization || organizations[0]);
+        }
       } else {
         showAuthScreen();
         setStatus("Email verified successfully! Sign in to access your dashboard.");
@@ -279,34 +417,52 @@ async function signInToWorkspace() {
 
     workspaceIdToken = googleCredential.idToken;
     sessionStorage.setItem("igotu-workspace-id-token", workspaceIdToken);
+    localStorage.setItem("igotu-workspace-id-token", workspaceIdToken);
     localStorage.setItem(emailForSignInStorageKey, email);
 
-    // Send verification email before taking them to the dashboard
-    setStatus("Sending verification email…");
-    try {
-      await sendEmailVerification(credential.user, {
-        url: `${window.location.origin}${window.location.pathname}`,
-        handleCodeInApp: true
-      });
-    } catch (emailErr) {
-      console.warn("sendEmailVerification notice:", emailErr);
+    // Check if the user is already verified
+    await credential.user.reload().catch(() => {});
+    if (credential.user.emailVerified) {
+      clearPendingVerification();
+      stopVerificationPolling();
+      await connectSignedInUser(credential.user);
+      return;
     }
-    setStatus("");
-    showVerifyAccountScreen(email);
-    signedInUser = null;
-  } catch (error) {
-    if (signedInUser) {
+
+    // User is NOT verified yet - cannot access dashboard.
+    // Check tracking logic: Have we already sent a verification email to this address?
+    // Checks localStorage or Firebase cloud creationTime to detect existing accounts even if browser history was cleared.
+    const pending = getPendingVerification();
+    const isExistingUser = Boolean(
+      credential.user.metadata?.creationTime &&
+      credential.user.metadata?.lastSignInTime &&
+      credential.user.metadata.creationTime !== credential.user.metadata.lastSignInTime
+    );
+    const alreadySent = Boolean((pending && pending.email === email) || isExistingUser);
+
+    if (!alreadySent) {
+      setStatus("Sending verification email…");
       try {
-        await deleteUser(signedInUser);
-      } catch (deleteError) {
-        console.warn("Could not delete unauthorized Firebase user:", deleteError);
+        await sendEmailVerification(credential.user, {
+          url: getVerificationActionUrl(),
+          handleCodeInApp: true
+        });
+      } catch (emailErr) {
+        console.warn("sendEmailVerification notice:", emailErr);
       }
+      setStatus("");
+    } else {
+      setStatus("");
     }
+
+    setPendingVerification(email, "google");
+    showVerifyAccountScreen(email);
+    startVerificationPolling();
+  } catch (error) {
     const popupWasClosed = ["auth/popup-closed-by-user", "auth/cancelled-popup-request"].includes(error.code);
     if (popupWasClosed || !alreadyVerified) {
-      workspaceIdToken = "";
+      clearWorkspaceToken();
       workspaceDomain = "";
-      sessionStorage.removeItem("igotu-workspace-id-token");
       await signOut(auth).catch(() => {});
     }
     const message = error.code === "auth/unauthorized-domain"
@@ -336,13 +492,15 @@ async function handleEmailSignIn(event) {
       return;
     }
     localStorage.setItem(emailForSignInStorageKey, email);
+    setPendingVerification(email, "email");
     setStatus("Sending verification email…");
     await sendSignInLinkToEmail(auth, email, {
-      url: `${window.location.origin}${window.location.pathname}`,
+      url: getVerificationActionUrl(),
       handleCodeInApp: true
     });
     setStatus("");
     showVerifyAccountScreen(email);
+    startVerificationPolling();
   } catch (error) {
     if (error.code === "auth/operation-not-allowed") {
       setStatus("Email sign-in is not enabled for this project yet.", "error");
@@ -364,6 +522,8 @@ async function completeEmailLinkSignIn(email) {
     const credential = await signInWithEmailLink(auth, email, window.location.href);
     signedInUser = credential.user;
     localStorage.removeItem(emailForSignInStorageKey);
+    clearPendingVerification();
+    stopVerificationPolling();
     window.history.replaceState({}, document.title, window.location.pathname);
     await connectSignedInUser(credential.user, { deferDashboard: true });
     signedInUser = null;
@@ -426,7 +586,13 @@ async function connectSignedInUser(user, options = {}) {
     : "Signed in with your organization's verified email.");
 }
 
-document.querySelector("#sign-out").addEventListener("click", () => signOut(auth));
+document.querySelector("#sign-out").addEventListener("click", () => {
+  stopVerificationPolling();
+  clearPendingVerification();
+  clearWorkspaceToken();
+  workspaceDomain = "";
+  signOut(auth);
+});
 
 document.querySelector("#new-org-name").addEventListener("input", (event) => {
   if (slugManuallyEdited) return;
@@ -484,7 +650,7 @@ organizationForm.addEventListener("submit", async (event) => {
     await loadOrganizations(result.organization.slug);
     setStatus(body.published ? "Settings saved. Your page is public." : "Settings saved. Your page is private.");
   } catch (error) {
-    setStatus(error.message);
+    setStatus(error.message, "error");
   }
 });
 
@@ -510,38 +676,72 @@ document.querySelector("#copy-page-link").addEventListener("click", async () => 
 });
 
 async function handleAuthState(user) {
-  if (user && (workspaceIdToken || workspaceDomain)) return;
-  if (verifyAccountPanel && !verifyAccountPanel.hidden) return;
-  if (verifiedSuccessPanel && !verifiedSuccessPanel.hidden) return;
-  dashboard.hidden = true;
-  if (!user) {
-    workspaceIdToken = "";
+  const pending = getPendingVerification();
+
+  if (user) {
+    const email = user.email?.toLowerCase() || "";
+    const domain = email.split("@").pop();
+    if (!email || domain === "gmail.com" || domain === "googlemail.com") {
+      stopVerificationPolling();
+      clearPendingVerification();
+      try {
+        await deleteUser(user);
+      } catch (e) {
+        console.warn("Could not delete invalid user on auth state change:", e);
+      }
+      clearWorkspaceToken();
+      workspaceDomain = "";
+      await signOut(auth).catch(() => {});
+      authPanel.hidden = false;
+      if (verifyAccountPanel) verifyAccountPanel.hidden = true;
+      if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
+      organizationForm.hidden = true;
+      setStatus("Use your organization's Google Workspace account. Personal Gmail accounts aren't accepted.", "error");
+      return;
+    }
+
+    try {
+      await user.reload();
+    } catch (e) {
+      console.warn("Could not reload user in auth state change:", e);
+    }
+
+    if (user.emailVerified) {
+      stopVerificationPolling();
+      clearPendingVerification();
+      if (verifyAccountPanel) verifyAccountPanel.hidden = true;
+      if (verifiedSuccessPanel && !verifiedSuccessPanel.hidden) {
+        return;
+      }
+      try {
+        await connectSignedInUser(user);
+        return;
+      } catch (e) {
+        console.warn("connectSignedInUser error in auth state:", e);
+      }
+    } else {
+      const displayEmail = email || pending?.email || "";
+      if (displayEmail) {
+        setPendingVerification(displayEmail, user.providerData?.[0]?.providerId === "google.com" ? "google" : "email");
+        showVerifyAccountScreen(displayEmail);
+        startVerificationPolling();
+        return;
+      }
+    }
+  } else {
+    if (pending?.email) {
+      showVerifyAccountScreen(pending.email);
+      startVerificationPolling();
+      return;
+    }
+
+    clearWorkspaceToken();
     workspaceDomain = "";
-    sessionStorage.removeItem("igotu-workspace-id-token");
     authPanel.hidden = false;
     if (verifyAccountPanel) verifyAccountPanel.hidden = true;
     if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
     organizationForm.hidden = true;
     setStatus("");
-    return;
-  }
-
-  const email = user.email?.toLowerCase() || "";
-  const domain = email.split("@").pop();
-  if (!email || domain === "gmail.com" || domain === "googlemail.com") {
-    try {
-      await deleteUser(user);
-    } catch (e) {
-      console.warn("Could not delete invalid user on auth state change:", e);
-    }
-    workspaceIdToken = "";
-    workspaceDomain = "";
-    await signOut(auth).catch(() => {});
-    authPanel.hidden = false;
-    if (verifyAccountPanel) verifyAccountPanel.hidden = true;
-    if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
-    organizationForm.hidden = true;
-    setStatus("Use your organization's Google Workspace account. Personal Gmail accounts aren't accepted.", "error");
     return;
   }
 
@@ -580,8 +780,12 @@ function showOrganization(organization) {
   for (const key of ["security", "medical", "counselor"]) {
     const contact = organization.contacts?.[key] || {};
     document.querySelector(`#${key}-label`).value = contact.label || "";
-    document.querySelector(`#${key}-phone`).value = contact.phone || "";
     document.querySelector(`#${key}-description`).value = contact.description || "";
+    const countrySelect = document.querySelector(`#${key}-country`);
+    const phoneInput = document.querySelector(`#${key}-phone`);
+    if (countrySelect && phoneInput) {
+      setPhoneAndCountry(countrySelect, phoneInput, contact.phone || "");
+    }
   }
   document.querySelector("#page-link-preview").textContent =
     `Public page: ${publicPageUrl(organization.slug)}`;
@@ -600,13 +804,140 @@ function showOrganization(organization) {
   }
 }
 
+const COUNTRY_CONFIGS = {
+  "+91": { name: "India (+91)", code: "+91", min: 10, max: 10, placeholder: "98765 43210" },
+  "+1": { name: "USA (+1)", code: "+1", min: 10, max: 10, placeholder: "202 555 0123" },
+  "+1-CA": { name: "Canada (+1)", code: "+1", min: 10, max: 10, placeholder: "416 555 0123" },
+  "+44": { name: "UK (+44)", code: "+44", min: 10, max: 11, placeholder: "7911 123456" },
+  "+61": { name: "Australia (+61)", code: "+61", min: 9, max: 9, placeholder: "412 345 678" },
+  "+49": { name: "Germany (+49)", code: "+49", min: 10, max: 11, placeholder: "151 23456789" },
+  "other": { name: "Other", code: "", min: 7, max: 15, placeholder: "Phone number" }
+};
+
+function formatAndValidatePhone(rawNumber, countryKey, contactKey) {
+  const contactNames = {
+    security: "Security contact",
+    medical: "Medical services",
+    counselor: "Counsellor"
+  };
+  const roleName = contactNames[contactKey] || "Contact";
+  const trimmed = (rawNumber || "").trim();
+  if (!trimmed) return "";
+
+  if (!/^\+?[0-9 ()-]+$/.test(trimmed)) {
+    throw new Error(`${roleName} phone number contains invalid characters. Use digits, spaces, and hyphens.`);
+  }
+
+  let digits = trimmed.replace(/\D/g, "");
+
+  if (countryKey === "+91") {
+    if (trimmed.startsWith("+91") || (digits.startsWith("91") && digits.length === 12)) {
+      digits = digits.slice(2);
+    }
+    if (digits.length !== 10) {
+      throw new Error(`${roleName} phone number must be 10 digits for India (+91).`);
+    }
+    return `+91 ${digits}`;
+  }
+
+  if (countryKey === "+1") {
+    if (trimmed.startsWith("+1") || (digits.startsWith("1") && digits.length === 11)) {
+      digits = digits.slice(1);
+    }
+    if (digits.length !== 10) {
+      throw new Error(`${roleName} phone number must be 10 digits for USA (+1).`);
+    }
+    return `+1 ${digits}`;
+  }
+
+  if (countryKey === "+1-CA") {
+    if (trimmed.startsWith("+1") || (digits.startsWith("1") && digits.length === 11)) {
+      digits = digits.slice(1);
+    }
+    if (digits.length !== 10) {
+      throw new Error(`${roleName} phone number must be 10 digits for Canada (+1).`);
+    }
+    return `+1 ${digits}`;
+  }
+
+  if (countryKey === "+44") {
+    if (trimmed.startsWith("+44") || (digits.startsWith("44") && (digits.length === 12 || digits.length === 13))) {
+      digits = digits.slice(2);
+    }
+    if (digits.length !== 10 && digits.length !== 11) {
+      throw new Error(`${roleName} phone number must be 10 or 11 digits for UK (+44).`);
+    }
+    return `+44 ${digits}`;
+  }
+
+  if (countryKey === "+61") {
+    if (trimmed.startsWith("+61") || (digits.startsWith("61") && digits.length === 11)) {
+      digits = digits.slice(2);
+    }
+    if (digits.length !== 9) {
+      throw new Error(`${roleName} phone number must be 9 digits for Australia (+61).`);
+    }
+    return `+61 ${digits}`;
+  }
+
+  if (countryKey === "+49") {
+    if (trimmed.startsWith("+49") || (digits.startsWith("49") && (digits.length === 12 || digits.length === 13))) {
+      digits = digits.slice(2);
+    }
+    if (digits.length !== 10 && digits.length !== 11) {
+      throw new Error(`${roleName} phone number must be 10 or 11 digits for Germany (+49).`);
+    }
+    return `+49 ${digits}`;
+  }
+
+  if (digits.length < 7 || digits.length > 15) {
+    throw new Error(`${roleName} phone number must be between 7 and 15 digits.`);
+  }
+  return trimmed.startsWith("+") ? trimmed : `+${trimmed}`;
+}
+
+function setPhoneAndCountry(countrySelect, phoneInput, rawPhone) {
+  const trimmed = (rawPhone || "").trim();
+  if (!trimmed) {
+    countrySelect.value = "+91";
+    phoneInput.value = "";
+    phoneInput.placeholder = COUNTRY_CONFIGS["+91"].placeholder;
+    return;
+  }
+  const prefixes = [
+    { code: "+91", prefix: "+91" },
+    { code: "+44", prefix: "+44" },
+    { code: "+61", prefix: "+61" },
+    { code: "+49", prefix: "+49" },
+    { code: "+1", prefix: "+1" }
+  ];
+  const match = prefixes.find((p) => trimmed.startsWith(p.prefix));
+  if (match) {
+    countrySelect.value = match.code;
+    phoneInput.value = trimmed.slice(match.prefix.length).trim();
+    phoneInput.placeholder = (COUNTRY_CONFIGS[match.code] || COUNTRY_CONFIGS["other"]).placeholder;
+  } else {
+    countrySelect.value = "other";
+    phoneInput.value = trimmed;
+    phoneInput.placeholder = COUNTRY_CONFIGS["other"].placeholder;
+  }
+}
+
 function readContactsFromForm() {
   const contacts = {};
   for (const key of ["security", "medical", "counselor"]) {
+    const label = document.querySelector(`#${key}-label`).value.trim();
+    const description = document.querySelector(`#${key}-description`).value.trim();
+    const countrySelect = document.querySelector(`#${key}-country`);
+    const phoneInput = document.querySelector(`#${key}-phone`);
+    const country = countrySelect ? countrySelect.value : "+91";
+    const rawNumber = phoneInput ? phoneInput.value.trim() : "";
+    const phone = formatAndValidatePhone(rawNumber, country, key);
+
     contacts[key] = {
-      label: document.querySelector(`#${key}-label`).value.trim(),
-      phone: document.querySelector(`#${key}-phone`).value.trim(),
-      description: document.querySelector(`#${key}-description`).value.trim()
+      label,
+      phone,
+      description
     };
   }
   return contacts;
@@ -768,3 +1099,37 @@ function showPlaceMessage(results, input, message) {
   results.hidden = false;
   input.setAttribute("aria-expanded", "true");
 }
+
+function initializePhoneInputs() {
+  for (const key of ["security", "medical", "counselor"]) {
+    const countrySelect = document.querySelector(`#${key}-country`);
+    const phoneInput = document.querySelector(`#${key}-phone`);
+    if (!countrySelect || !phoneInput) continue;
+
+    countrySelect.addEventListener("change", () => {
+      const config = COUNTRY_CONFIGS[countrySelect.value] || COUNTRY_CONFIGS["other"];
+      phoneInput.placeholder = config.placeholder;
+    });
+
+    phoneInput.addEventListener("input", () => {
+      const val = phoneInput.value.trim();
+      if (val.startsWith("+")) {
+        for (const prefix of ["+91", "+44", "+61", "+49"]) {
+          if (val.startsWith(prefix)) {
+            countrySelect.value = prefix;
+            phoneInput.value = val.slice(prefix.length).trim();
+            phoneInput.placeholder = (COUNTRY_CONFIGS[prefix] || COUNTRY_CONFIGS["other"]).placeholder;
+            return;
+          }
+        }
+        if (val.startsWith("+1")) {
+          countrySelect.value = "+1";
+          phoneInput.value = val.slice(2).trim();
+          phoneInput.placeholder = COUNTRY_CONFIGS["+1"].placeholder;
+        }
+      }
+    });
+  }
+}
+
+initializePhoneInputs();
