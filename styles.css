@@ -122,6 +122,7 @@ h3 { color: var(--ink); font-family: 'DM Sans', system-ui, -apple-system, BlinkM
 
 .support-header .organization-name {
   margin: 4px 0 0;
+  padding: 2px 0;
   font-size: calc(1rem + 4px);
   font-weight: 800;
   line-height: 1.25;
@@ -175,7 +176,7 @@ h3 { color: var(--ink); font-family: 'DM Sans', system-ui, -apple-system, BlinkM
 .intro h3, .admin-page-heading > p { font-size: calc(1rem + 4px); }
 .intro > p:last-child { padding-bottom: 9px; margin-bottom: 0; color: var(--muted); font-size: calc(.96rem + 2px); }
 .intro::after { display: block; margin-top: 14px; border-top: 1px solid var(--divider); content: ""; }
-.organization-name { margin: 10px 0 0; color: var(--brand); font-size: calc(1rem + 4px); font-weight: 800; }
+.organization-name { margin: 10px 0 0; padding: 2px 0; color: var(--brand); font-size: calc(1rem + 4px); font-weight: 800; }
 .organization-status { margin: 12px auto 0; color: var(--muted); font-size: calc(.85rem + 2px); }
 .about-content { max-width: 760px; margin: 0 auto; }
 .about-content h2 { margin-bottom: 10px; font-size: calc(1.35rem + 2px); }
