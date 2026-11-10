@@ -773,6 +773,26 @@ document.querySelector("#copy-page-link").addEventListener("click", async () => 
   }
 });
 
+document.querySelector("#delete-organization-button")?.addEventListener("click", async () => {
+  if (!selectedOrganization) return;
+  const orgName = selectedOrganization.name;
+  const orgSlug = selectedOrganization.slug;
+  const confirmed = window.confirm(
+    `Are you sure you want to permanently delete "${orgName}" (${orgSlug}) and all its details? This cannot be undone.`
+  );
+  if (!confirmed) return;
+
+  try {
+    setStatus("Deleting organization page…");
+    await apiRequest(`/api/organizations/${encodeURIComponent(orgSlug)}`, "DELETE");
+    selectedOrganization = null;
+    await loadOrganizations();
+    setStatus(`"${orgName}" and all its details have been removed.`);
+  } catch (error) {
+    setStatus(error.message, "error");
+  }
+});
+
 async function handleAuthState(user) {
   // If we're mid-transition or the dashboard is already showing, don't interfere
   if (isTransitioningToSuccess) return;

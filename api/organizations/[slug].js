@@ -25,8 +25,18 @@ export default async function handler(request, response) {
       return;
     }
 
+    if (request.method === "DELETE") {
+      const user = await requireVerifiedUser(request);
+      const current = await organizations.findOne({ _id: slug, adminUids: user.uid });
+      if (!current) throw new HttpError(404, "You do not have access to this organization.");
+
+      await organizations.deleteOne({ _id: slug, adminUids: user.uid });
+      response.status(200).json({ success: true, deletedSlug: slug });
+      return;
+    }
+
     if (request.method !== "PUT") {
-      response.setHeader("Allow", "GET, PUT");
+      response.setHeader("Allow", "GET, PUT, DELETE");
       throw new HttpError(405, "Method not allowed.");
     }
 
