@@ -99,22 +99,30 @@ async function isUserVerified(user) {
     return true;
   }
 
-  // 2. Force-refresh ID token and check Firebase custom claim (authoritative source)
+  // 2. Verified flag for this UID in localStorage
+  if (localStorage.getItem(`igotu_verified_uid_${user.uid}`) === "true") {
+    sessionStorage.setItem(`igotu_session_verified_${user.uid}`, "true");
+    return true;
+  }
+
+  // 3. Force-refresh ID token and check Firebase custom claim (authoritative source)
   try {
     const tokenResult = await user.getIdTokenResult(true);
     if (tokenResult?.claims?.igotu_verified === true) {
       sessionStorage.setItem(`igotu_session_verified_${user.uid}`, "true");
+      localStorage.setItem(`igotu_verified_uid_${user.uid}`, "true");
       return true;
     }
   } catch (e) {
     console.warn("getIdTokenResult check error:", e);
   }
 
-  // 3. Ask server status endpoint — authoritative check
+  // 4. Ask server status endpoint — authoritative check
   try {
     const res = await apiRequest("/api/auth/status", "GET");
     if (res?.verified === true) {
       sessionStorage.setItem(`igotu_session_verified_${user.uid}`, "true");
+      localStorage.setItem(`igotu_verified_uid_${user.uid}`, "true");
       return true;
     }
   } catch (e) {
@@ -137,6 +145,7 @@ async function markUserVerified(user) {
 }
 
 let isTransitioningToSuccess = false;
+let dashboardReady = false; // set true once connectSignedInUser succeeds
 
 function showVerifiedSuccessScreen() {
   authPanel.hidden = true;
@@ -151,35 +160,49 @@ async function triggerVerificationSuccessTransition(user) {
 
   stopVerificationPolling();
   clearPendingVerification();
-
   showVerifiedSuccessScreen();
 
-  if (user) {
-    sessionStorage.setItem(`igotu_session_verified_${user.uid}`, "true");
-    localStorage.setItem(`igotu_verified_uid_${user.uid}`, "true");
-    localStorage.setItem("igotu_just_verified", Date.now().toString());
-    sessionStorage.removeItem(`igotu_awaiting_verification_${user.uid}`);
-    await markUserVerified(user);
+  const currentUser = user || auth?.currentUser;
+
+  if (currentUser) {
+    // Mark verified in all local caches immediately so handleAuthState never re-routes
+    sessionStorage.setItem(`igotu_session_verified_${currentUser.uid}`, "true");
+    localStorage.setItem(`igotu_verified_uid_${currentUser.uid}`, "true");
+    sessionStorage.removeItem(`igotu_awaiting_verification_${currentUser.uid}`);
+    clearPendingVerification();
+
+    // Fire-and-forget server confirmation (non-blocking)
+    apiRequest("/api/auth/confirm-verification", "POST").catch((e) =>
+      console.warn("confirm-verification notice:", e)
+    );
+
+    // Pre-load dashboard data while success screen is showing
     try {
-      await connectSignedInUser(user, { deferDashboard: true });
+      await connectSignedInUser(currentUser, { deferDashboard: true });
+      dashboardReady = true;
     } catch (e) {
       console.warn("connectSignedInUser error in transition:", e);
     }
   }
 
+  // After 3 seconds reveal dashboard on THIS same tab/window
   setTimeout(() => {
     if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
-    if (auth?.currentUser) {
+    const activeUser = auth?.currentUser || currentUser;
+    if (activeUser) {
       dashboard.hidden = false;
+      authPanel.hidden = true;
+      if (verifyAccountPanel) verifyAccountPanel.hidden = true;
       if (organizations.length > 0) {
         showOrganization(selectedOrganization || organizations[0]);
       }
     } else {
+      // Signed out in the interim — just show auth
       showAuthScreen();
-      setStatus("Email verified successfully! Sign in to access your dashboard.");
+      setStatus("Email verified! Please sign in to access your dashboard.");
     }
     isTransitioningToSuccess = false;
-  }, 2500);
+  }, 3000);
 }
 
 async function checkVerificationStatus() {
@@ -257,15 +280,10 @@ if (!isFirebaseConfigured) {
   const urlParams = new URLSearchParams(window.location.search);
   const authMode = urlParams.get("mode");
   const actionCode = urlParams.get("oobCode");
-  const isVerifiedRedirect = urlParams.get("verified") === "true";
-  const justVerifiedOnLoad = localStorage.getItem("igotu_just_verified");
-  const wasRecentlyVerified = isVerifiedRedirect || (justVerifiedOnLoad && Date.now() - Number(justVerifiedOnLoad) < 15_000);
   const isActionRedirect = (authMode === "verifyEmail" && actionCode) || isSignInWithEmailLink(auth, window.location.href);
 
-  if (wasRecentlyVerified) {
-    showVerifiedSuccessScreen();
-    isTransitioningToSuccess = true;
-  } else if (pendingOnLoad?.email && !isActionRedirect) {
+  // Show verify screen early if we have a pending email and no action redirect coming
+  if (!isActionRedirect && pendingOnLoad?.email) {
     showVerifyAccountScreen(pendingOnLoad.email);
     startVerificationPolling();
   }
@@ -494,9 +512,28 @@ async function signInToWorkspace() {
     // Refresh user state
     await credential.user.reload().catch(() => {});
 
-    // Check if the user is already verified in IGotU (via custom claims or server)
-    const verified = await isUserVerified(credential.user);
-    if (verified) {
+    // Check if the user is genuinely verified in IGotU (via custom claims or server)
+    let genuinelyVerified = false;
+    try {
+      const tokenResult = await credential.user.getIdTokenResult(true);
+      if (tokenResult?.claims?.igotu_verified === true) genuinelyVerified = true;
+    } catch {}
+    if (!genuinelyVerified) {
+      try {
+        const res = await apiRequest("/api/auth/status", "GET");
+        if (res?.verified === true) genuinelyVerified = true;
+      } catch {}
+    }
+
+    if (!genuinelyVerified) {
+      localStorage.removeItem(`igotu_verified_uid_${credential.user.uid}`);
+      sessionStorage.removeItem(`igotu_session_verified_${credential.user.uid}`);
+    } else {
+      localStorage.setItem(`igotu_verified_uid_${credential.user.uid}`, "true");
+      sessionStorage.setItem(`igotu_session_verified_${credential.user.uid}`, "true");
+    }
+
+    if (genuinelyVerified) {
       clearPendingVerification();
       stopVerificationPolling();
       await connectSignedInUser(credential.user);
@@ -607,6 +644,8 @@ async function completeEmailLinkSignIn(email) {
 
 async function connectSignedInUser(user, options = {}) {
   const { deferDashboard = false } = options;
+  stopVerificationPolling();
+  clearPendingVerification();
   try {
     const result = await apiRequest("/api/auth/workspace", "POST");
     workspaceDomain = result.domain;
@@ -614,6 +653,7 @@ async function connectSignedInUser(user, options = {}) {
     console.warn("api/auth/workspace notice:", err);
     workspaceDomain = user.email ? user.email.split("@")[1] : "";
   }
+  dashboardReady = true;
   if (!deferDashboard) {
     dashboard.hidden = false;
     authPanel.hidden = true;
@@ -648,6 +688,7 @@ document.querySelector("#sign-out").addEventListener("click", () => {
   clearPendingVerification();
   clearWorkspaceToken();
   workspaceDomain = "";
+  dashboardReady = false;
   signOut(auth);
 });
 
@@ -733,18 +774,12 @@ document.querySelector("#copy-page-link").addEventListener("click", async () => 
 });
 
 async function handleAuthState(user) {
-  if (isTransitioningToSuccess) {
-    if (user) {
-      markUserVerified(user);
-    }
-    return;
-  }
+  // If we're mid-transition or the dashboard is already showing, don't interfere
+  if (isTransitioningToSuccess) return;
+  if (dashboardReady && !dashboard.hidden) return;
 
   const pending = getPendingVerification();
   const urlParams = new URLSearchParams(window.location.search);
-  const isVerifiedRedirect = urlParams.get("verified") === "true";
-  const justVerified = localStorage.getItem("igotu_just_verified");
-  const wasRecentlyVerified = isVerifiedRedirect || (justVerified && Date.now() - Number(justVerified) < 15_000);
 
   if (user) {
     const email = user.email?.toLowerCase() || "";
@@ -774,13 +809,27 @@ async function handleAuthState(user) {
       console.warn("Could not reload user in auth state change:", e);
     }
 
-    if (wasRecentlyVerified) {
-      if (urlParams.get("verified") === "true") {
-        window.history.replaceState({}, document.title, window.location.pathname);
+    // If the success panel is currently visible, we're in transition — don't re-route
+    if (verifiedSuccessPanel && !verifiedSuccessPanel.hidden) return;
+
+    // Check session-level verified flag first (fastest, no network)
+    const sessionVerified = sessionStorage.getItem(`igotu_session_verified_${user.uid}`) === "true";
+    const localVerified = localStorage.getItem(`igotu_verified_uid_${user.uid}`) === "true";
+
+    if (sessionVerified || localVerified) {
+      // Already verified — go straight to dashboard
+      stopVerificationPolling();
+      clearPendingVerification();
+      if (verifyAccountPanel) verifyAccountPanel.hidden = true;
+      if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
+      try {
+        await connectSignedInUser(user);
+        return;
+      } catch (e) {
+        console.warn("connectSignedInUser error (cached verified):", e);
+        // Don't fall through to unverified — stay where we are
+        return;
       }
-      localStorage.removeItem("igotu_just_verified");
-      await triggerVerificationSuccessTransition(user);
-      return;
     }
 
     const verified = await isUserVerified(user);
@@ -799,9 +848,6 @@ async function handleAuthState(user) {
       stopVerificationPolling();
       clearPendingVerification();
       if (verifyAccountPanel) verifyAccountPanel.hidden = true;
-      if (verifiedSuccessPanel && !verifiedSuccessPanel.hidden) {
-        return;
-      }
       try {
         await connectSignedInUser(user);
         return;
@@ -822,17 +868,9 @@ async function handleAuthState(user) {
       }
     }
   } else {
-    if (wasRecentlyVerified) {
-      showVerifiedSuccessScreen();
-      if (urlParams.get("verified") === "true") {
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-      localStorage.removeItem("igotu_just_verified");
-      setTimeout(() => {
-        if (verifiedSuccessPanel) verifiedSuccessPanel.hidden = true;
-        showAuthScreen();
-        setStatus("Email verified successfully! Sign in to access your dashboard.");
-      }, 2500);
+    // No user signed in
+    if (verifiedSuccessPanel && !verifiedSuccessPanel.hidden) {
+      // Success screen is showing — let the timer handle it, don't interfere
       return;
     }
 
