@@ -323,6 +323,8 @@ footer strong { color: var(--brand); }
 .auth-actions .button { min-width: 220px; }
 .button-email { color: #fff; background: #1a73e8; }
 .button-email:hover { background: #1765cc; }
+.button-sample { color: #fff; background: #e06c00; }
+.button-sample:hover { background: #c05800; }
 .google-sign-in { color: #3c4043; border-color: #dadce0; background: #fff; }
 .google-sign-in:hover { background: #f7f8f8; }
 .google-icon { width: 20px; height: 20px; object-fit: contain; }
